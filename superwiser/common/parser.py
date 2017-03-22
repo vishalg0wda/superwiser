@@ -11,7 +11,7 @@ from ConfigParser import RawConfigParser
 # ==============================================================================
 
 def get_program_from_section(section):
-    return section.strip('program:')
+    return section.split('program:')[1]
 
 
 def extract_section(parsed, section):
@@ -110,7 +110,7 @@ def update_section(parsed, section_name, section_body):
         # Exclude internally used options(those starting with "_" underscore)
         if option.startswith('_'):
             continue
-        parsed.set(section_body, option, value)
+        parsed.set(section_name, option, value)
 
     return parsed
 
@@ -125,13 +125,13 @@ def build_conf_from_template(proc_tuples, template):
     """
     result = RawConfigParser()
     for (program_name, numprocs) in proc_tuples:
-        section = build_process_name(program_name)
+        section = build_section_from_program(program_name)
         # Extract section from template
         section_body = extract_section(template, section)
 
         # Apply overrides
-        if numprocs <= 1:
-            section_body.pop('numprocs', None)
+        if numprocs > 1:
+            section_body['numprocs'] = numprocs
         section_body['process_name'] = build_process_name(
             program_name, numprocs)
 
