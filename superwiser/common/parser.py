@@ -10,6 +10,7 @@ from ConfigParser import RawConfigParser
 # Reader based utilities
 # ==============================================================================
 
+
 def get_program_from_section(section):
     return section.split('program:')[1]
 
@@ -18,7 +19,7 @@ def extract_section(parsed, section):
     """Returns a dictionary constructed from a section."""
     d = {k: v for (k, v) in parsed.items(section)}
     # also include the name of the program, strip the "program:" part
-    d['_program_name'] = get_program_from_section(section)
+    d['hs_program_name'] = get_program_from_section(section)
 
     return d
 
@@ -49,7 +50,7 @@ def list_proc_tuples(parsed, proc_key='numprocs'):
     programs = list_programs(parsed)
     for program in programs:
         numprocs = int(program.get(proc_key, '0'))
-        result.append((program['_program_name'], numprocs))
+        result.append((program['hs_program_name'], numprocs))
 
     return result
 
@@ -72,6 +73,7 @@ def parse_content(content):
     parsed = RawConfigParser()
     parsed.readfp(wrap_content_as_fp(content))
     return parsed
+
 
 # ==============================================================================
 # Writer based utilities
@@ -107,8 +109,8 @@ def update_section(parsed, section_name, section_body):
     """
     parsed.add_section(section_name)
     for (option, value) in section_body.items():
-        # Exclude internally used options(those starting with "_" underscore)
-        if option.startswith('_'):
+        # Exclude internally used options(those starting with "hs_")
+        if option.startswith('hs_'):
             continue
         parsed.set(section_name, option, value)
 
@@ -139,3 +141,25 @@ def build_conf_from_template(proc_tuples, template):
         update_section(result, section, section_body)
 
     return result
+
+
+def calculate_delta(old, new):
+    """Calculate added & removed sections between two configs.
+
+    :old: Previous configuration state
+    :type: RawConfigParser instance
+    :new: New configuration state
+    :type: RawConfigParser instance
+    :returns: added & removed sections
+    :rtype: dict
+    """
+    old_sections = set(old.sections())
+    new_sections = set(new.sections())
+
+    added_sections = new_sections - old_sections
+    removed_sections = old_sections - new_sections
+
+    return {
+        'added_sections': list(added_sections),
+        'removed_sections': list(removed_sections),
+    }
