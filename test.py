@@ -1,9 +1,7 @@
-from superwiser.master.factory import BaseConfFactory, EyeOfMordorFactory
-from superwiser.common.parser import *
-from superwiser.master.core import *
+from superwiser.master.server import start_server
 
 
-
+"""
 def main():
     bc = BaseConfFactory().make_base_conf(parse_content(''))
     e = EyeOfMordorFactory().make_eye_of_mordor(bc)
@@ -13,3 +11,7 @@ def main():
     e.distributor.add_node(n2)
     e.update_conf(parse_file('./supervisord_0.conf'))
     return e
+"""
+
+if __name__ == '__main__':
+    start_server()

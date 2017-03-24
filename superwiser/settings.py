@@ -1,0 +1,4 @@
+SERVICE_NAMESPACE = 'he-superwiser'
+ZK_HOST = 'localhost'
+ZK_PORT = 2181
+MASTER_PORT = 12345

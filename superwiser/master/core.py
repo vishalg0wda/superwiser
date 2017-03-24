@@ -2,14 +2,18 @@ import math
 from collections import defaultdict
 from operator import attrgetter, itemgetter
 
-from superwiser.common.parser import calculate_delta
+from superwiser.common.parser import calculate_delta, extract_conf_from_parsed
 from superwiser.common.parser import build_section_from_program
 from superwiser.common.parser import extract_section, update_section
 from superwiser.common.parser import get_program_from_section, list_proc_tuples
+from superwiser.common.log import logger
 
 
 class BaseConf(object):
-    def __init__(self, parsed):
+    def __init__(self):
+        self.parsed = None
+
+    def set_parsed(self, parsed):
         self.parsed = parsed
 
     def add_section(self, section_name, section_body):
@@ -40,6 +44,14 @@ class Distributor(object):
 
     def get_node(self, node_name):
         return (n for n in self.nodes if n.name == node_name).next()
+
+    def synchronize_nodes(self, callback):
+        for node in self.nodes:
+            if node.is_dirty:
+                conf = extract_conf_from_parsed(node.parsed)
+                # TODO: Do whatever with conf
+                callback(conf)
+                node.is_dirty = False
 
     def calculate_assignable_loads(self):
         node_loads = sum(node.load for node in self.nodes)
@@ -74,7 +86,7 @@ class Distributor(object):
             churned[name] += nprocs
             return self.rlighten(load_tuples[1:], remaining_load, churned)
         if remaining_load < 0:
-            if nprocs > 1 and weight < excess_load:
+            if nprocs > 1 and weight <= excess_load:
                 churned[name] += 1
                 load_tuples[0] = (name, nprocs - 1, weight)
                 return self.rlighten(
@@ -89,16 +101,17 @@ class Distributor(object):
             program = self.base_conf.get_program_body(program_name)
             program['numprocs'] = numprocs
             prog_weight = float(program.get('hs_weight', '1'))
-            prog_load_tuples = (program_name, numprocs, prog_weight)
+            prog_load_tuples.append((program_name, numprocs, prog_weight))
         prog_load_tuples = sorted(prog_load_tuples,
-                                  key=itemgetter(2),
+                                  key=lambda(t): t[1] * t[2],
                                   reverse=True)
 
         # try and fill excess load by pulling out tuples
-        return self.rlighten(
+        out = self.rlighten(
             prog_load_tuples,
             excess_load,
             defaultdict(int))
+        return out
 
     def calculate_program_load(self, program):
         weight = float(program.get('hs_weight', '1'))
@@ -125,7 +138,7 @@ class Distributor(object):
             node.undertake(pgm)
             return self.rburden(prog_tuples[1:], lazy_nodes)
         if remaining_load < 0:
-            if numprocs > 1 and weight < load_deficit:
+            if numprocs > 1 and weight <= load_deficit:
                 pgm['numprocs'] = 1
                 node.undertake(pgm)
                 prog_tuples[0] = (prog_name, numprocs - 1)
@@ -137,7 +150,6 @@ class Distributor(object):
         return self.rburden(prog_tuples[1:], lazy_nodes[1:])
 
     def distribute(self):
-        print "distributing load.."
         assignable_loads = self.calculate_assignable_loads()
         # segregate lazy and busy nodes
         lazy_nodes = [e for e in assignable_loads if e[1] > 0]
@@ -147,12 +159,10 @@ class Distributor(object):
         allottables = defaultdict(int)
         for (node_name, excess_load) in busy_nodes:
             node = self.get_node(node_name)
-            relievables = self.get_relievable_programs(node, excess_load)
+            relievables = self.get_relievable_programs(node, -excess_load)
             for (k, v) in relievables.items():
                 allottables[k] += v
 
-        print "allottables:"
-        print allottables
         # burden lazy nodes
         self.rburden(allottables.items(), lazy_nodes)
 
@@ -194,6 +204,8 @@ class WNode(object):
         self.parsed = parsed
         self.base_conf = base_conf
 
+        self.is_dirty = False
+
     def get_prog_tuples(self):
         return list_proc_tuples(self.parsed)
 
@@ -227,9 +239,18 @@ class WNode(object):
                            build_section_from_program(program_name),
                            program)
 
+        self.is_dirty = True
+
     def relieve(self, program_name):
         self.parsed.remove_section(
             build_section_from_program(program_name))
+
+        self.is_dirty = True
+
+    def flush(self, fp):
+        if self.is_dirty:
+            self.parsed.write(fp)
+            self.is_dirty = False
 
     def has_program(self, program_name):
         return self.parsed.has_section(
@@ -258,7 +279,6 @@ class EyeOfMordor(object):
             # remove program across nodes containing it
             self.distributor.remove_program(get_program_from_section(section))
 
-        import ipdb; ipdb.set_trace()
         self.distributor.distribute()
         # Remove removed sections from base conf
         for section in delta['removed_sections']:
@@ -273,3 +293,6 @@ class EyeOfMordor(object):
         status = self.distributor.decrease_procs(program_name, factor)
         self.distributor.distribute()
         return status
+
+    def teardown(self):
+        logger.info('tearing down the eye of mordor')

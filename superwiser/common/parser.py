@@ -107,6 +107,8 @@ def update_section(parsed, section_name, section_body):
     :section_body: The options that go into the section
     :returns: Updated RawConfigParser instance
     """
+    if parsed.has_section(section_name):
+        parsed.remove_section(section_name)
     parsed.add_section(section_name)
     for (option, value) in section_body.items():
         # Exclude internally used options(those starting with "hs_")
@@ -117,7 +119,7 @@ def update_section(parsed, section_name, section_body):
     return parsed
 
 
-def build_conf_from_template(proc_tuples, template):
+def build_conf(proc_tuples, template):
     """Build a configuration iterating over proc_tuples referencing template.
 
     :proc_tuples: List of (programe_name, numprocs) tuples
@@ -166,3 +168,10 @@ def calculate_delta(old, new):
         'added_sections': added_sections,
         'removed_sections': removed_sections,
     }
+
+
+def extract_conf_from_parsed(parsed):
+    dest = StringIO.StringIO()
+    parsed.write(dest)
+    dest.seek(0)
+    return dest.read()
