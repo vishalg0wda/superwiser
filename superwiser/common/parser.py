@@ -49,7 +49,7 @@ def list_proc_tuples(parsed, proc_key='numprocs'):
     result = []
     programs = list_programs(parsed)
     for program in programs:
-        numprocs = int(program.get(proc_key, '0'))
+        numprocs = int(program.get(proc_key, '1'))
         result.append((program['hs_program_name'], numprocs))
 
     return result
@@ -57,7 +57,7 @@ def list_proc_tuples(parsed, proc_key='numprocs'):
 
 def wrap_content_as_fp(content):
     """Wraps a raw byte stream as a file pointer."""
-    fp = StringIO(content)
+    fp = StringIO.StringIO(content)
     return fp
 
 
@@ -156,10 +156,13 @@ def calculate_delta(old, new):
     old_sections = set(old.sections())
     new_sections = set(new.sections())
 
-    added_sections = new_sections - old_sections
-    removed_sections = old_sections - new_sections
+    # include only programs
+    added_sections = [section for section in new_sections - old_sections
+                      if section.startswith('program:')]
+    removed_sections = [section for section in old_sections - new_sections
+                        if section.startswith('program:')]
 
     return {
-        'added_sections': list(added_sections),
-        'removed_sections': list(removed_sections),
+        'added_sections': added_sections,
+        'removed_sections': removed_sections,
     }

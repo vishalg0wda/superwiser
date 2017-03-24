@@ -5,7 +5,7 @@ from operator import attrgetter, itemgetter
 from superwiser.common.parser import calculate_delta
 from superwiser.common.parser import build_section_from_program
 from superwiser.common.parser import extract_section, update_section
-from superwiser.common.parser import get_program_from_section
+from superwiser.common.parser import get_program_from_section, list_proc_tuples
 
 
 class BaseConf(object):
@@ -43,7 +43,7 @@ class Distributor(object):
 
     def calculate_assignable_loads(self):
         node_loads = sum(node.load for node in self.nodes)
-        mean_load = math.fsum(node_loads) / len(self.nodes)
+        mean_load = float(node_loads) / len(self.nodes)
         assignable_loads = []
         can_floor = False
         for node in self.nodes:
@@ -137,6 +137,7 @@ class Distributor(object):
         return self.rburden(prog_tuples[1:], lazy_nodes[1:])
 
     def distribute(self):
+        print "distributing load.."
         assignable_loads = self.calculate_assignable_loads()
         # segregate lazy and busy nodes
         lazy_nodes = [e for e in assignable_loads if e[1] > 0]
@@ -150,6 +151,8 @@ class Distributor(object):
             for (k, v) in relievables.items():
                 allottables[k] += v
 
+        print "allottables:"
+        print allottables
         # burden lazy nodes
         self.rburden(allottables.items(), lazy_nodes)
 
@@ -182,6 +185,60 @@ class Distributor(object):
                 else:
                     program['numprocs'] = deductable
                     node.undertake(program)
+                    factor = 0
+
+
+class WNode(object):
+    def __init__(self, name, parsed, base_conf):
+        self.name = name
+        self.parsed = parsed
+        self.base_conf = base_conf
+
+    def get_prog_tuples(self):
+        return list_proc_tuples(self.parsed)
+
+    @property
+    def load(self):
+        total = 0.0
+        for (program_name, numprocs) in self.get_prog_tuples():
+            program = self.base_conf.get_program_body(program_name)
+            weight = float(program.get('hs_weight', '1'))
+            total += numprocs * weight
+        return total
+
+    def undertake(self, program):
+        program = program.copy()
+        program_name = program.pop('hs_program_name')
+        if self.has_program(program_name):
+            old_program = self.get_program(program_name)
+            old_numprocs = int(old_program.get('numprocs', '1'))
+            delta_numprocs = int(program.get('numprocs', '1'))
+            new_numprocs = old_numprocs + delta_numprocs
+            if new_numprocs <= 0:
+                self.relieve(program_name)
+            else:
+                program['numprocs'] = new_numprocs
+                update_section(
+                    self.parsed,
+                    build_section_from_program(program_name),
+                    program)
+        else:
+            update_section(self.parsed,
+                           build_section_from_program(program_name),
+                           program)
+
+    def relieve(self, program_name):
+        self.parsed.remove_section(
+            build_section_from_program(program_name))
+
+    def has_program(self, program_name):
+        return self.parsed.has_section(
+            build_section_from_program(program_name))
+
+    def get_program(self, program_name):
+        return extract_section(
+            self.parsed,
+            build_section_from_program(program_name))
 
 
 class EyeOfMordor(object):
@@ -190,10 +247,10 @@ class EyeOfMordor(object):
         self.distributor = distributor
 
     def update_conf(self, new_conf):
-        delta = calculate_delta(self.base_conf, new_conf)
+        delta = calculate_delta(self.base_conf.parsed, new_conf)
         for section in delta['added_sections']:
             # first add new section to base conf
-            program = extract_section(section)
+            program = extract_section(new_conf, section)
             self.base_conf.add_section(section, program)
             # allot program across nodes
             self.distributor.add_program(program)
@@ -201,7 +258,18 @@ class EyeOfMordor(object):
             # remove program across nodes containing it
             self.distributor.remove_program(get_program_from_section(section))
 
+        import ipdb; ipdb.set_trace()
         self.distributor.distribute()
         # Remove removed sections from base conf
         for section in delta['removed_sections']:
             self.base_conf.remove_section(section)
+
+    def increase_procs(self, program_name, factor=1):
+        status = self.distributor.increase_procs(program_name, factor)
+        self.distributor.distribute()
+        return status
+
+    def decrease_procs(self, program_name, factor=1):
+        status = self.distributor.decrease_procs(program_name, factor)
+        self.distributor.distribute()
+        return status
