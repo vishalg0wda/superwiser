@@ -297,11 +297,13 @@ class EyeOfMordor(object):
     def increase_procs(self, program_name, factor=1):
         status = self.distributor.increase_procs(program_name, factor)
         self.distributor.distribute()
+        self.distributor.synchronize_nodes(self.zk.sync_node)
         return status
 
     def decrease_procs(self, program_name, factor=1):
         status = self.distributor.decrease_procs(program_name, factor)
         self.distributor.distribute()
+        self.distributor.synchronize_nodes(self.zk.sync_node)
         return status
 
     def teardown(self):

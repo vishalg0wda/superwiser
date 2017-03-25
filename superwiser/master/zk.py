@@ -33,8 +33,6 @@ class ZkClient(object):
         currents = set(self.con.get_children(self.path.ncurrent()))
         for node in (currents - wnodes):
             self.con.delete(self.path.ncurrent(node))
-        # setup watches
-        self.con.ChildrenWatch(self.path.node(), self.on_wnode)
 
     def on_wnode(self, children):
         children = set(children) - {'current', 'sync'}
@@ -72,6 +70,8 @@ class ZkClient(object):
         self.distributor.base_conf.set_parsed(parse_content(conf))
 
     def init_wnodes(self):
+        # setup watches
+        self.con.ChildrenWatch(self.path.node(), self.on_wnode)
         # Walk over current nodes and setup distributor
         for node_name in self.con.get_children(self.path.ncurrent()):
             self.wnodes.append(node_name)

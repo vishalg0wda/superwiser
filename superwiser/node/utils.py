@@ -14,12 +14,13 @@ def initialize_dirs():
 
 def is_supervisor_running():
     cmd = ['supervisorctl', '-c', MAIN_CONF_PATH, 'pid']
-    output = subprocess.check_output(cmd)
+
     try:
+        output = subprocess.check_output(cmd)
         # returns a pid if running
         int(output)
         return True
-    except ValueError:
+    except (subprocess.CalledProcessError, ValueError):
         return False
 
 

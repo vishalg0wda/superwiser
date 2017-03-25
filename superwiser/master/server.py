@@ -11,7 +11,10 @@ from superwiser.common.log import logger
 class Superwiser(Protocol):
     def dataReceived(self, data):
         # command: increase_procs(program_name, 1)
-        cmd, rest = data.split('(')
+        try:
+            cmd, rest = data.split('(')
+        except:
+            return
         rest = rest.strip().rstrip(')')
         if cmd == 'increase_procs':
             program_name, factor = rest.split(',')
@@ -32,6 +35,12 @@ class Superwiser(Protocol):
             self.transport.write(str(result) + '\n')
         else:
             self.transport.write('Invalid operation\n')
+
+    def connectionMade(self):
+        self.transport.write('Hello\n')
+
+    def connectionLost(self):
+        self.transport.write('Goodbye\n')
 
 
 class SuperwiserFactory(Factory):
