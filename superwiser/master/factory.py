@@ -26,9 +26,11 @@ class EyeOfMordorFactory(object):
     def make_eye_of_mordor(self):
         if EyeOfMordorFactory._instance is None:
             base_conf = BaseConfFactory().make_base_conf()
+            zk = ZkClientFactory().make_zk_client()
             EyeOfMordorFactory._instance = EyeOfMordor(
                 base_conf,
-                DistributorFactory().make_distributor())
+                DistributorFactory().make_distributor(),
+                zk)
         return EyeOfMordorFactory._instance
 
 

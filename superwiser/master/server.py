@@ -27,7 +27,6 @@ class Superwiser(Protocol):
             self.transport.write(str(result) + '\n')
         elif cmd == 'update_conf':
             # TODO: implement update conf
-            import ipdb; ipdb.set_trace()
             conf = requests.get(rest).content
             result = self.factory.master.update_conf(parse_content(conf))
             self.transport.write(str(result) + '\n')
@@ -40,14 +39,12 @@ class SuperwiserFactory(Factory):
 
     def __init__(self):
         self.master = EyeOfMordorFactory().make_eye_of_mordor()
-        from superwiser.master.core import WNode
-        node = WNode('node1', parse_content(''), self.master.base_conf)
-        self.master.distributor.add_node(node)
         self.zk = ZkClientFactory().make_zk_client()
 
     def teardown(self):
         self.master.teardown()
         self.zk.teardown()
+
 
 def start_server():
     factory = SuperwiserFactory()

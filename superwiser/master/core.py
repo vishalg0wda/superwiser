@@ -50,7 +50,7 @@ class Distributor(object):
             if node.is_dirty:
                 conf = extract_conf_from_parsed(node.parsed)
                 # TODO: Do whatever with conf
-                callback(conf)
+                callback(node, conf)
                 node.is_dirty = False
 
     def calculate_assignable_loads(self):
@@ -166,6 +166,12 @@ class Distributor(object):
         # burden lazy nodes
         self.rburden(allottables.items(), lazy_nodes)
 
+    def distribute_conf(self, conf):
+        for (program_name, numprocs) in list_proc_tuples(conf):
+            program = self.base_conf.get_prog_tuples(program_name)
+            program['numprocs'] = numprocs
+            self.add_program(program)
+
     def add_program(self, program):
         lazy_node = sorted(self.nodes, key=attrgetter('load'))[0]
         lazy_node.undertake(program)
@@ -263,9 +269,10 @@ class WNode(object):
 
 
 class EyeOfMordor(object):
-    def __init__(self, base_conf, distributor):
+    def __init__(self, base_conf, distributor, zk):
         self.base_conf = base_conf
         self.distributor = distributor
+        self.zk = zk
 
     def update_conf(self, new_conf):
         delta = calculate_delta(self.base_conf.parsed, new_conf)
@@ -283,6 +290,9 @@ class EyeOfMordor(object):
         # Remove removed sections from base conf
         for section in delta['removed_sections']:
             self.base_conf.remove_section(section)
+
+        self.zk.set_base_conf(extract_conf_from_parsed(new_conf))
+        self.distributor.synchronize_nodes(self.zk.sync_node)
 
     def increase_procs(self, program_name, factor=1):
         status = self.distributor.increase_procs(program_name, factor)
