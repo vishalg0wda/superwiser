@@ -11,17 +11,48 @@ from ConfigParser import RawConfigParser
 # ==============================================================================
 
 
-def get_program_from_section(section):
+def program_from_section(section):
     return section.split('program:')[1]
 
 
-def extract_section(parsed, section):
-    """Returns a dictionary constructed from a section."""
-    d = {k: v for (k, v) in parsed.items(section)}
-    # also include the name of the program, strip the "program:" part
-    d['hs_program_name'] = get_program_from_section(section)
+def section_from_program(program_name):
+    return "program:{}".format(program_name)
 
-    return d
+
+def unparse(parsed):
+    dest = StringIO.StringIO()
+    parsed.write(dest)
+    dest.seek(0)
+    return dest.read()
+
+
+def manipulate_numprocs(parsed, program_name, func):
+    section = build_section_from_program(program_name)
+    numprocs = 1
+    if parsed.has_option(section, 'numprocs'):
+        numprocs = int(parsed.get(section, 'numprocs'))
+
+    numprocs = func(numprocs)
+    if numprocs <= 0:
+        raise Exception('You cannot bring numprocs down to 0!')
+    elif numprocs == 1:
+        parsed.remove_option(section, 'numprocs')
+    if numprocs > 1:
+        parsed.set(section, 'numprocs', numprocs)
+
+    return unparse(parsed)
+
+def extract_section(parsed, section):
+    """Returns a 2-tuple (section_name, dictionary) constructed
+    from a section.
+
+    :parsed: RawConfigParser instance
+    :section: Complete section name
+    :returns: 2-tuple (program_name, section_body)
+    """
+    section_body = {k: v for (k, v) in parsed.items(section)}
+
+    return (get_program_from_section(section), section_body)
 
 
 def list_programs(parsed):
@@ -170,11 +201,6 @@ def calculate_delta(old, new):
     }
 
 
-def extract_conf_from_parsed(parsed):
-    dest = StringIO.StringIO()
-    parsed.write(dest)
-    dest.seek(0)
-    return dest.read()
 
 
 def merge_confs(conf1, conf2):

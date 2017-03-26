@@ -65,7 +65,7 @@ class ZkClient(object):
         if children:
             self.distributor.distribute()
 
-        Self.set_state_conf(
+        self.set_state_conf(
             extract_conf_from_parsed(self.distributor.build_conf_state()))
         self.distributor.synchronize_nodes(self.sync_node)
 

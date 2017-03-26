@@ -2,39 +2,42 @@ import requests
 from twisted.internet import reactor
 from twisted.internet.protocol import Protocol, Factory
 
-from superwiser.common.parser import parse_content
-from superwiser.master.factory import EyeOfMordorFactory, ZkClientFactory
+from superwiser.master.core import Sauron
 from superwiser.settings import MASTER_PORT
 from superwiser.common.log import logger
 
 
 class Superwiser(Protocol):
-    def dataReceived(self, data):
-        # command: increase_procs(program_name, 1)
+    def parse_command(self, data):
+        cmd, args = None, []
         try:
             cmd, rest = data.split('(')
+            if cmd in ['increase_procs', 'decrease_procs']:
+                prog, factor = rest.split(',')
+                prog = prog.strip()
+                factor = int(factor)
+                args = [prog, factor]
+            elif cmd in ['update_conf']:
+                args = [rest]
         except:
-            return
-        rest = rest.strip().rstrip(')')
-        if cmd == 'increase_procs':
-            program_name, factor = rest.split(',')
-            program_name = program_name.strip()
-            factor = int(factor)
-            result = self.factory.master.increase_procs(program_name, factor)
+            pass
+
+        return (cmd, args)
+
+    def dataReceived(self, data):
+        cmd, args = self.parse_command(data)
+        if cmd is None:
+            self.transport.write('Invalid operation\n')
+        elif cmd == 'increase_procs':
+            result = self.overlord.increase_procs(*args)
             self.transport.write(str(result) + '\n')
         elif cmd == 'decrease_procs':
-            program_name, factor = rest.split(',')
-            program_name = program_name.strip()
-            factor = int(factor)
-            result = self.factory.master.decrease_procs(program_name, factor)
+            result = self.overlord.decrease_procs(*args)
             self.transport.write(str(result) + '\n')
         elif cmd == 'update_conf':
-            # TODO: implement update conf
-            conf = requests.get(rest).content
-            result = self.factory.master.update_conf(parse_content(conf))
+            conf = requests.get(*args).content
+            result = self.overlord.update_conf(conf)
             self.transport.write(str(result) + '\n')
-        else:
-            self.transport.write('Invalid operation\n')
 
     def connectionMade(self):
         self.transport.write('Hello\n')
@@ -44,15 +47,16 @@ class Superwiser(Protocol):
 
 
 class SuperwiserFactory(Factory):
-    protocol = Superwiser
-
     def __init__(self):
-        self.master = EyeOfMordorFactory().make_eye_of_mordor()
-        self.zk = ZkClientFactory().make_zk_client()
+        self.overlord = Sauron()
+
+    def buildProtocol(self, addr):
+        prot = Superwiser()
+        prot.overlord = self.overlord
+        return prot
 
     def teardown(self):
-        self.master.teardown()
-        self.zk.teardown()
+        self.overlord.teardown()
 
 
 def start_server():
