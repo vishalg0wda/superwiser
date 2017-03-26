@@ -175,3 +175,27 @@ def extract_conf_from_parsed(parsed):
     parsed.write(dest)
     dest.seek(0)
     return dest.read()
+
+
+def merge_confs(conf1, conf2, removed=False):
+    conf1_tups = list_proc_tuples(conf1)
+    conf2_tups = list_proc_tuples(conf2)
+    conf1_procs = set(ele[0] for ele in conf1_tups)
+    conf2_procs = set(ele[0] for ele in conf2_tups)
+    result = set()
+    if removed:
+        for proc in (conf1_procs - conf2_procs):
+            result.add(next(ele for ele in conf1_tups if ele[0] == proc))
+        return list(result)
+    for tup in conf1_tups:
+        result.add(tup)
+    for tup in conf2_tups:
+        result.add(tup)
+    # override common tups
+    for proc in (conf1_procs & conf2_procs):
+        conf1_numproc = next(ele[1] for ele in conf1_tups if ele[0] == proc)
+        conf2_numproc = next(ele[1] for ele in conf2_tups if ele[0] == proc)
+        result.remove(next(ele for ele in result if ele[0] == proc))
+        result.add((proc, conf1_numproc + conf2_numproc))
+
+    return list(result)

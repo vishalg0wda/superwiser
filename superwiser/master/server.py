@@ -39,7 +39,7 @@ class Superwiser(Protocol):
     def connectionMade(self):
         self.transport.write('Hello\n')
 
-    def connectionLost(self):
+    def connectionLost(self, reason):
         self.transport.write('Goodbye\n')
 
 

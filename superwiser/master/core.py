@@ -39,8 +39,11 @@ class Distributor(object):
     def add_node(self, node):
         self.nodes.append(node)
 
-    def remove_node(self, node):
-        self.nodes.remove(node)
+    def remove_node(self, node_name):
+        self.nodes.remove(
+            next(
+                node for node in self.nodes
+                if node.name == node_name))
 
     def get_node(self, node_name):
         return (n for n in self.nodes if n.name == node_name).next()
@@ -144,9 +147,8 @@ class Distributor(object):
                 prog_tuples[0] = (prog_name, numprocs - 1)
                 lazy_nodes[0] = (node_name, load_deficit - weight)
                 return self.rburden(prog_tuples, lazy_nodes)
-            else:
-                node.undertake(pgm)
 
+        node.undertake(pgm)
         return self.rburden(prog_tuples[1:], lazy_nodes[1:])
 
     def distribute(self):
