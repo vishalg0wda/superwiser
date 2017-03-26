@@ -24,6 +24,12 @@ def is_supervisor_running():
         return False
 
 
+def init_supervisor():
+    logger.info('flushing conf')
+    # flush conf file
+    open(INCLUDE_CONF_PATH, 'w').close()
+
+
 def start_supervisor():
     logger.info('starting supervisor')
     cmd = ['supervisord', '-c', MAIN_CONF_PATH]

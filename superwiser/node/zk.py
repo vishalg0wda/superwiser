@@ -5,7 +5,6 @@ from superwiser.settings import ZK_HOST, ZK_PORT
 from superwiser.common.path import PathMaker
 from superwiser.common.log import logger
 from superwiser.node.utils import write_to_conf, update_supervisor, teardown
-from superwiser.node.utils import get_current_conf
 
 
 class ZkClient(object):
@@ -26,8 +25,6 @@ class ZkClient(object):
         cur_path = self.path.ncurrent(self.name)
         self.con.create(sync_path, ephemeral=True)
         self.con.create(cur_path)
-        # write current configuration onto cur path
-        self.con.set(cur_path, get_current_conf())
         # register watch on sync node.
         self.con.DataWatch(sync_path, self.on_sync)
 

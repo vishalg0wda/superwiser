@@ -42,7 +42,6 @@ class ZkClient(object):
         children = set(children) - {'current', 'sync'}
         removed = set(self.wnodes) - set(children)
         added = set(children) - set(self.wnodes)
-
         for node in removed:
             self.distributor.remove_node(node)
             self.wnodes.remove(node)
@@ -66,7 +65,7 @@ class ZkClient(object):
         if children:
             self.distributor.distribute()
 
-        self.set_state_conf(
+        Self.set_state_conf(
             extract_conf_from_parsed(self.distributor.build_conf_state()))
         self.distributor.synchronize_nodes(self.sync_node)
 
