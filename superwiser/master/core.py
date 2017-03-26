@@ -3,9 +3,11 @@ from collections import defaultdict
 from operator import attrgetter, itemgetter
 
 from superwiser.common.parser import calculate_delta, extract_conf_from_parsed
-from superwiser.common.parser import build_section_from_program
+from superwiser.common.parser import build_section_from_program, parse_content
 from superwiser.common.parser import extract_section, update_section
+from superwiser.common.parser import merge_confs
 from superwiser.common.parser import get_program_from_section, list_proc_tuples
+from superwiser.common.parser import build_conf
 from superwiser.common.log import logger
 
 
@@ -207,6 +209,14 @@ class Distributor(object):
                     program['numprocs'] = deductable
                     node.undertake(program)
                     factor = 0
+
+    def build_conf_state(self):
+        state = parse_content('')
+        for node in self.nodes:
+            state = build_conf(
+                merge_confs(state, node.parsed), self.base_conf.parsed)
+
+        return state
 
 
 class WNode(object):
