@@ -1,4 +1,4 @@
-from superwiser.settings import SERVICE_NAMESPACE
+from superwiser.common.settings import SERVICE_NAMESPACE
 
 
 class PathMaker(object):

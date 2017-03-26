@@ -3,7 +3,7 @@ from twisted.internet import reactor
 from twisted.internet.protocol import Protocol, Factory
 
 from superwiser.master.core import Sauron
-from superwiser.settings import MASTER_PORT
+from superwiser.master.settings import MASTER_PORT
 from superwiser.common.log import logger
 
 
@@ -62,6 +62,6 @@ class SuperwiserFactory(Factory):
 def start_server():
     factory = SuperwiserFactory()
     reactor.listenTCP(MASTER_PORT, factory)
-    logger.info('starting server now')
+    logger.info('Starting server now')
     reactor.addSystemEventTrigger('before', 'shutdown', factory.teardown)
     reactor.run()

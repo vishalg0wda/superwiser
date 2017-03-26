@@ -1,7 +1,7 @@
 import os
 import subprocess
 
-from superwiser.node.settings import CONF_DIR
+from superwiser.common.settings import CONF_DIR
 from superwiser.common.log import logger
 
 
@@ -32,6 +32,7 @@ class Conf(object):
 class Supervisor(object):
     def __init__(self, conf):
         self.conf = conf
+        self.conf_path = conf.main_path
         self.setup()
 
     def setup(self):
@@ -62,8 +63,9 @@ class Supervisor(object):
         cmd = ['supervisorctl', '-c', self.conf_path, 'shutdown']
         return subprocess.check_call(cmd)
 
-    def update(self):
+    def update(self, conf):
         logger.info('updating supervisor')
+        self.conf.write(conf)
         cmd = ['supervisorctl', '-c', self.conf_path, 'update']
         return subprocess.check_call(cmd)
 

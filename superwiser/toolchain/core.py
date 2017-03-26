@@ -1,6 +1,6 @@
 from kazoo.client import KazooClient
-from kazoo.recipes.watchers import DataWatch
-from kazoo.protocl.states import EventType
+from kazoo.recipe.watchers import DataWatch
+from kazoo.protocol.states import EventType
 
 from superwiser.common.settings import ZK_HOST, ZK_PORT
 from superwiser.common.path import PathMaker
@@ -15,6 +15,8 @@ class Orc(object):
         self.setup()
 
     def setup(self):
+        logger.info('Setting up Orc')
+        self.zk.start()
         # Setup ephemeral node
         path = self.zk.create(
             self.path.toolchain('orc'),
@@ -30,4 +32,9 @@ class Orc(object):
         if event and event.type == EventType.CHANGED:
             logger.info('Synchronizing toolchain')
             self.supervisor.update(data)
-            self.supervisor.reload()
+
+    def teardown(self):
+        logger.info('Tearing down Orc')
+        self.zk.stop()
+        self.zk.close()
+        self.supervisor.teardown()

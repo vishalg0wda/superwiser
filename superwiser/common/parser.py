@@ -6,11 +6,6 @@ except ImportError:
 from ConfigParser import RawConfigParser
 
 
-# ==============================================================================
-# Reader based utilities
-# ==============================================================================
-
-
 def program_from_section(section):
     return section.split('program:')[1]
 
@@ -27,7 +22,7 @@ def unparse(parsed):
 
 
 def manipulate_numprocs(parsed, program_name, func):
-    section = build_section_from_program(program_name)
+    section = section_from_program(program_name)
     numprocs = 1
     if parsed.has_option(section, 'numprocs'):
         numprocs = int(parsed.get(section, 'numprocs'))
@@ -42,77 +37,19 @@ def manipulate_numprocs(parsed, program_name, func):
 
     return unparse(parsed)
 
+
 def extract_section(parsed, section):
     """Returns a 2-tuple (section_name, dictionary) constructed
     from a section.
 
     :parsed: RawConfigParser instance
     :section: Complete section name
-    :returns: 2-tuple (program_name, section_body)
+    :returns: section_body(dict)
     """
-    section_body = {k: v for (k, v) in parsed.items(section)}
-
-    return (get_program_from_section(section), section_body)
-
-
-def list_programs(parsed):
-    """Returns a list of dictionaries corresponding to program configurations
-    in supervisor.
-
-    :parsed: ConfigParser instance
-    :returns: list of dictionaries
-    """
-    result = []
-    for section in parsed.sections():
-        result.append(extract_section(parsed, section))
-
+    result = dict(parsed.items(section))
+    result['numprocs'] = int(result.get('numprocs', '1'))
+    result['weight'] = float(result.get('weight', '1'))
     return result
-
-
-def list_proc_tuples(parsed, proc_key='numprocs'):
-    """Iterate over sections in the configuration, extract numprocs if provided
-    else set it to 0. Return a list of 2-tuples.
-
-    :parsed: ConfigParser instance
-    :proc_key: key used to set numprocs in the config
-    :returns: list of 2 tuples
-    """
-    result = []
-    programs = list_programs(parsed)
-    for program in programs:
-        numprocs = int(program.get(proc_key, '1'))
-        result.append((program['hs_program_name'], numprocs))
-
-    return result
-
-
-def wrap_content_as_fp(content):
-    """Wraps a raw byte stream as a file pointer."""
-    fp = StringIO.StringIO(content)
-    return fp
-
-
-def parse_file(path):
-    """Parses a file and returns a RawConfigParser instance."""
-    parsed = RawConfigParser()
-    parsed.read(path)
-    return parsed
-
-
-def parse_content(content):
-    """Parses some content and returns a RawConfigParser instance"""
-    parsed = RawConfigParser()
-    parsed.readfp(wrap_content_as_fp(content))
-    return parsed
-
-
-# ==============================================================================
-# Writer based utilities
-# ==============================================================================
-
-
-def build_section_from_program(program):
-    return "program:{}".format(program)
 
 
 def build_process_name(program_name, numprocs):
@@ -142,9 +79,6 @@ def update_section(parsed, section_name, section_body):
         parsed.remove_section(section_name)
     parsed.add_section(section_name)
     for (option, value) in section_body.items():
-        # Exclude internally used options(those starting with "hs_")
-        if option.startswith('hs_'):
-            continue
         parsed.set(section_name, option, value)
 
     return parsed
@@ -159,14 +93,16 @@ def build_conf(proc_tuples, template):
     :rtype: RawConfigParser instance
     """
     result = RawConfigParser()
-    for (program_name, numprocs) in proc_tuples:
-        section = build_section_from_program(program_name)
+    for (program_name, numprocs, _) in proc_tuples:
+        section = section_from_program(program_name)
         # Extract section from template
         section_body = extract_section(template, section)
 
         # Apply overrides
         if numprocs > 1:
             section_body['numprocs'] = numprocs
+        else:
+            section_body.pop('numprocs', None)
         section_body['process_name'] = build_process_name(
             program_name, numprocs)
 
@@ -176,48 +112,53 @@ def build_conf(proc_tuples, template):
     return result
 
 
-def calculate_delta(old, new):
-    """Calculate added & removed sections between two configs.
+def extract_programs(parsed):
+    """Returns a list of dictionaries corresponding to program configurations
+    in supervisor.
 
-    :old: Previous configuration state
-    :type: RawConfigParser instance
-    :new: New configuration state
-    :type: RawConfigParser instance
-    :returns: added & removed sections
-    :rtype: dict
+    :parsed: ConfigParser instance
+    :returns: list of dictionaries
     """
-    old_sections = set(old.sections())
-    new_sections = set(new.sections())
-
-    # include only programs
-    added_sections = [section for section in new_sections - old_sections
-                      if section.startswith('program:')]
-    removed_sections = [section for section in old_sections - new_sections
-                        if section.startswith('program:')]
-
-    return {
-        'added_sections': added_sections,
-        'removed_sections': removed_sections,
-    }
+    result = {}
+    for section in parsed.sections():
+        program_name = program_from_section(section)
+        result[program_name] = extract_section(parsed, section)
+    return result
 
 
+def extract_prog_tuples(parsed, proc_key='numprocs'):
+    """Iterate over sections in the configuration, extract numprocs if provided
+    else set it to 0. Return a list of 2-tuples.
+
+    :parsed: ConfigParser instance
+    :proc_key: key used to set numprocs in the config
+    :returns: list of 2 tuples
+    """
+    result = []
+    programs = extract_programs(parsed)
+    for (program_name, program_body) in programs.items():
+        result.append(
+            (program_name,
+             program_body['numprocs'],
+             program_body['weight']))
+    return result
 
 
-def merge_confs(conf1, conf2):
-    conf1_tups = list_proc_tuples(conf1)
-    conf2_tups = list_proc_tuples(conf2)
-    conf1_procs = set(ele[0] for ele in conf1_tups)
-    conf2_procs = set(ele[0] for ele in conf2_tups)
-    result = set()
-    for tup in conf1_tups:
-        result.add(tup)
-    for tup in conf2_tups:
-        result.add(tup)
-    # override common tups
-    for proc in (conf1_procs & conf2_procs):
-        conf1_numproc = next(ele[1] for ele in conf1_tups if ele[0] == proc)
-        conf2_numproc = next(ele[1] for ele in conf2_tups if ele[0] == proc)
-        result.remove(next(ele for ele in result if ele[0] == proc))
-        result.add((proc, conf1_numproc + conf2_numproc))
+def wrap_content_as_fp(content):
+    """Wraps a raw byte stream as a file pointer."""
+    fp = StringIO.StringIO(content)
+    return fp
 
-    return list(result)
+
+def parse_file(path):
+    """Parses a file and returns a RawConfigParser instance."""
+    parsed = RawConfigParser()
+    parsed.read(path)
+    return parsed
+
+
+def parse_content(content):
+    """Parses some content and returns a RawConfigParser instance"""
+    parsed = RawConfigParser()
+    parsed.readfp(wrap_content_as_fp(content))
+    return parsed
