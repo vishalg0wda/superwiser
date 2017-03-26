@@ -164,13 +164,16 @@ class Distributor(object):
             relievables = self.get_relievable_programs(node, -excess_load)
             for (k, v) in relievables.items():
                 allottables[k] += v
+                program = self.base_conf.get_program_body(k)
+                program['numprocs'] = -v
+                node.undertake(program)
 
         # burden lazy nodes
         self.rburden(allottables.items(), lazy_nodes)
 
     def distribute_conf(self, conf):
         for (program_name, numprocs) in list_proc_tuples(conf):
-            program = self.base_conf.get_prog_tuples(program_name)
+            program = self.base_conf.get_program_body(program_name)
             program['numprocs'] = numprocs
             self.add_program(program)
 

@@ -44,7 +44,6 @@ class ZkClient(object):
         added = set(children) - set(self.wnodes)
         state_conf = parse_content(self.con.get(self.path.stateconf())[0])
 
-        import ipdb; ipdb.set_trace()
 
         for node in removed:
             self.distributor.remove_node(node)
@@ -57,10 +56,8 @@ class ZkClient(object):
             # remove current node
             self.con.delete(self.path.ncurrent(node))
             state_conf = build_conf(
-                merge_confs(
-                    state_conf,
-                    conf,
-                    removed=True))
+                merge_confs(state_conf, conf, removed=True),
+                self.distributor.base_conf.parsed)
         for node in added:
             # register watch on current node
             self.con.DataWatch(self.path.ncurrent(node), self.on_ncurrent)
