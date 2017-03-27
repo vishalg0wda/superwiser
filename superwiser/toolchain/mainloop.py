@@ -1,3 +1,5 @@
+import sys
+
 from twisted.internet import reactor
 
 from superwiser.common.log import logger
@@ -7,9 +9,15 @@ from superwiser.toolchain.settings import MAIN_CONF_PATH, INCLUDE_CONF_PATH
 
 
 def setup_orc():
-    logger.info('Settings up orc')
+    logger.info('Setting up orc')
+    main_conf = MAIN_CONF_PATH
+    inc_conf = INCLUDE_CONF_PATH
+    args = sys.argv[1:]
+    if args:
+        main_conf = 'conf/supervisord{}.conf'.format(args[0])
+        inc_conf = 'conf/magic{}.ini'.format(args[0])
     # setup Orc
-    conf = Conf(MAIN_CONF_PATH, INCLUDE_CONF_PATH)
+    conf = Conf(main_conf, inc_conf)
     supervisor = Supervisor(conf)
     orc = Orc(supervisor)
     return orc
