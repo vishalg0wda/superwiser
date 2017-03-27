@@ -18,7 +18,8 @@ class Superwiser(Protocol):
                 factor = factor.strip().rstrip(')')
                 factor = int(factor)
                 args = [prog, factor]
-            elif cmd in ['update_conf', 'stop_program', 'start_program']:
+            elif cmd in ['update_conf', 'stop_program',
+                         'start_program', 'restart_program']:
                 rest = rest.strip().rstrip(')')
                 args = [rest]
         except:
@@ -45,6 +46,9 @@ class Superwiser(Protocol):
             self.transport.write(str(result) + '\n')
         elif cmd == 'start_program':
             result = self.overlord.start_program(*args)
+            self.transport.write(str(result) + '\n')
+        elif cmd == 'restart_program':
+            result = self.overlord.restart_program(*args)
             self.transport.write(str(result) + '\n')
 
     def connectionMade(self):

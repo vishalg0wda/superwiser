@@ -166,6 +166,10 @@ class Sauron(object):
                     conf)))
         return True
 
+    def restart_program(self, program_name):
+        self.stop_program(program_name)
+        return self.start_program(program_name)
+
     def teardown(self):
         logger.info('Tearing down Sauron')
         self.eye.teardown()
