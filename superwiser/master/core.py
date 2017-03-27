@@ -9,6 +9,7 @@ from superwiser.common.path import PathMaker
 from superwiser.master.distribute import distribute_work
 from superwiser.common.parser import manipulate_numprocs, build_conf
 from superwiser.common.parser import parse_content, unparse
+from superwiser.common.parser import extract_prog_tuples
 
 
 class EyeOfMordor(object):
@@ -88,6 +89,9 @@ class Sauron(object):
     def update_conf(self, conf):
         logger.info('Updating conf')
         self.eye.set_conf(conf)
+        # Also update the file at BASE_CONFIG
+        with open(BASE_CONFIG, 'w') as dest:
+            dest.write(conf)
 
     def increase_procs(self, program_name, factor=1):
         logger.info('Increasing procs')
@@ -114,6 +118,53 @@ class Sauron(object):
             subtractor)
         # Simply set the conf to trigger a distribute and sync
         self.eye.set_conf(new_conf)
+
+    def start_program(self, program_name):
+        logger.info('Starting program')
+        # First check if program is defined in base conf
+        with open(BASE_CONFIG) as source:
+            base_conf = parse_content(source.read())
+        try:
+            program = next(ele for ele in extract_prog_tuples(base_conf)
+                           if ele[0] == program_name)
+        except StopIteration:
+            logger.info('Program is not defined')
+            return False
+        prog_tuples = extract_prog_tuples(
+            parse_content(self.eye.get_conf()))
+        has_program = any(ele for ele in prog_tuples
+                          if ele[0] == program_name)
+        if has_program:
+            logger.info('Already contains program')
+            return False
+        # Program did not exist, let's add it now
+        prog_tuples.append(program)
+        # Update conf and distribute
+        self.eye.set_conf(
+            unparse(
+                build_conf(
+                    prog_tuples,
+                    base_conf)))
+        return True
+
+    def stop_program(self, program_name):
+        logger.info('Stopping program')
+        conf = parse_content(self.eye.get_conf())
+        # Check if program exists
+        prog_tuples = extract_prog_tuples(conf)
+        for (pos, (prog_name, _, _)) in enumerate(prog_tuples):
+            if prog_name == program_name:
+                del prog_tuples[pos]
+                break
+        else:
+            logger.info('Program is either stopped/not been defined')
+            return False
+        self.eye.set_conf(
+            unparse(
+                build_conf(
+                    prog_tuples,
+                    conf)))
+        return True
 
     def teardown(self):
         logger.info('Tearing down Sauron')
