@@ -1,6 +1,6 @@
 from setuptools import setup
 
-setup(name='superwiser',
+setup(name='he-superwiser',
       version='0.1',
       description='Distributed job control across supervisors',
       url='https://github.com/farthVader91/superwiser/',
