@@ -96,7 +96,7 @@ class Sauron(object):
             return x + factor
 
         new_conf = manipulate_numprocs(
-            self.eye.get_conf(),
+            parse_content(self.eye.get_conf()),
             program_name,
             adder)
         # Simply set the conf to trigger a distribute and sync
@@ -109,7 +109,7 @@ class Sauron(object):
             return x - factor
 
         new_conf = manipulate_numprocs(
-            self.eye.get_conf(),
+            parse_content(self.eye.get_conf()),
             program_name,
             subtractor)
         # Simply set the conf to trigger a distribute and sync

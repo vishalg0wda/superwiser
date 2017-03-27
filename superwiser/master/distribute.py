@@ -6,10 +6,6 @@ from superwiser.common.parser import parse_content, extract_prog_tuples
 from superwiser.common.log import logger
 
 
-def calculate_load(entity):
-    return entity['numprocs'] * entity['weight']
-
-
 def raccumulate(work, remaining, churned):
     if remaining <= 0:
         return churned
@@ -84,9 +80,8 @@ def split_work(work, across):
     toggler = toggle_ceils()
     toggler.send(None)
     while True:
-        load = toggler.send(mean_load)
         # Assemble a mean portion of work
-        split = raccumulate(deepcopy(work), load, [])
+        split = raccumulate(deepcopy(work), toggler.send(mean_load), [])
         # Deduct assigned work from the main workload
         work = deduct(split, work)
         # Store assigned work

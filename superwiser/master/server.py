@@ -15,6 +15,7 @@ class Superwiser(Protocol):
             if cmd in ['increase_procs', 'decrease_procs']:
                 prog, factor = rest.split(',')
                 prog = prog.strip()
+                factor = factor.strip().rstrip(')')
                 factor = int(factor)
                 args = [prog, factor]
             elif cmd in ['update_conf']:
