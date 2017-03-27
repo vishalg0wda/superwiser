@@ -2,5 +2,10 @@
 
 from superwiser.toolchain.mainloop import start_loop
 
-if __name__ == '__main__':
+
+def main():
     start_loop()
+
+
+if __name__ == '__main__':
+    main()

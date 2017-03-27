@@ -64,8 +64,7 @@ class EyeOfMordor(object):
             logger.info('Toolchains joined/left')
             if children:
                 # Distribute work across toolchains
-                work = self.get_conf()
-                self.distribute(work, children)
+                self.distribute(self.get_conf(), children)
 
     def set_conf(self, conf):
         logger.info('Updating conf')
