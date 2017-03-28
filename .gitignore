@@ -1,5 +1,4 @@
 *.pyc
-aggregate.conf
 build/
 dist/
 *.egg-info
