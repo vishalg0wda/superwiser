@@ -11,9 +11,11 @@ from superwiser.master.distribute import distribute_work
 
 
 class EyeOfMordor(object):
-    def __init__(self, host, port):
+    def __init__(self, host, port, auto_redistribute):
         self.zk = KazooClient('{}:{}'.format(host, port))
         self.path = PathMaker()
+        self.auto_redistribute = auto_redistribute
+        self.toolchains = []
         self.setup()
 
     def setup(self):
@@ -21,6 +23,8 @@ class EyeOfMordor(object):
         self.zk.start()
         # Setup paths
         self.setup_paths()
+        # Initializse children
+        self.toolchains = self.zk.get_children(self.path.toolchain())
         # Register watches
         self.register_watches()
 
@@ -55,11 +59,22 @@ class EyeOfMordor(object):
                 self.distribute(data, toolchains)
 
     def on_toolchains(self, children, event):
-        if event:
-            logger.info('Toolchains joined/left')
-            if children:
-                # Distribute work across toolchains
-                self.distribute(self.get_conf(), children)
+        if not event:
+            return
+        added = set(children) - set(self.toolchains)
+        removed = set(self.toolchains) - set(children)
+        if added:
+            logger.info('Toolchain joined')
+            self.distribute(
+                self.get_conf(),
+                self.zk.get_children(self.path.toolchain()))
+        elif removed:
+            logger.info('Toolchain left')
+            if self.auto_redistribute:
+                self.distribute(
+                    self.get_conf(),
+                    self.zk.get_children(self.path.toolchain()))
+        self.toolchains = children
 
     def set_conf(self, conf):
         logger.info('Updating conf')

@@ -78,6 +78,9 @@ def parse_opts():
     parser.add_option('-c', '--config', dest='conf_path')
     parser.add_option('--zk-host')
     parser.add_option('--zk-port')
+    parser.add_option('--auto-redistribute',
+                      action='store_true',
+                      default=False)
     options, _ = parser.parse_args()
     return options.__dict__
 

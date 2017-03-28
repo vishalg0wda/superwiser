@@ -5,7 +5,7 @@ from superwiser.master.core import EyeOfMordor, Sauron
 
 
 class SauronFactory(object):
-    def make_sauron(self, conf_path, zk_host, zk_port):
+    def make_sauron(self, conf_path, zk_host, zk_port, auto_redistribute):
         logger.info('Making Sauron')
         if conf_path is None:
             conf_path = os.path.join(os.getcwd(), 'aggregate.conf')
@@ -15,4 +15,6 @@ class SauronFactory(object):
             zk_host = os.environ.get('ZK_HOST', 'localhost')
         if zk_port is None:
             zk_port = os.environ.get('ZK_PORT', 2181)
-        return Sauron(conf_path, EyeOfMordor(zk_host, zk_port))
+        return Sauron(
+            conf_path,
+            EyeOfMordor(zk_host, zk_port, auto_redistribute))
