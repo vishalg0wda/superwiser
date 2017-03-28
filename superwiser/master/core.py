@@ -3,18 +3,16 @@ from kazoo.recipe.watchers import DataWatch, ChildrenWatch
 from kazoo.protocol.states import EventType
 
 from superwiser.common.log import logger
-from superwiser.common.settings import ZK_HOST, ZK_PORT
-from superwiser.master.settings import BASE_CONFIG
 from superwiser.common.path import PathMaker
-from superwiser.master.distribute import distribute_work
 from superwiser.common.parser import manipulate_numprocs, build_conf
 from superwiser.common.parser import parse_content, unparse
 from superwiser.common.parser import extract_prog_tuples
+from superwiser.master.distribute import distribute_work
 
 
 class EyeOfMordor(object):
-    def __init__(self):
-        self.zk = KazooClient('{}:{}'.format(ZK_HOST, ZK_PORT))
+    def __init__(self, host, port):
+        self.zk = KazooClient('{}:{}'.format(host, port))
         self.path = PathMaker()
         self.setup()
 
@@ -25,9 +23,6 @@ class EyeOfMordor(object):
         self.setup_paths()
         # Register watches
         self.register_watches()
-        # Set base conf
-        with open(BASE_CONFIG) as source:
-            self.set_conf(source.read())
 
     def setup_paths(self):
         logger.info('Setting up paths')
@@ -82,14 +77,23 @@ class EyeOfMordor(object):
 
 
 class Sauron(object):
-    def __init__(self):
-        self.eye = EyeOfMordor()
+    def __init__(self, conf_path, eye):
+        self.conf_path = conf_path
+        self.eye = eye
+        self.setup()
+
+    def setup(self):
+        logger.info('Setting up Sauron')
+        # Set base conf
+        # Note: this will trigger a distribute
+        with open(self.conf_path) as source:
+            self.eye.set_conf(source.read())
 
     def update_conf(self, conf):
         logger.info('Updating conf')
         self.eye.set_conf(conf)
-        # Also update the file at BASE_CONFIG
-        with open(BASE_CONFIG, 'w') as dest:
+        # Also update the file at conf_path
+        with open(self.conf_path, 'w') as dest:
             dest.write(conf)
 
     def increase_procs(self, program_name, factor=1):
@@ -121,7 +125,7 @@ class Sauron(object):
     def start_program(self, program_name):
         logger.info('Starting program')
         # First check if program is defined in base conf
-        with open(BASE_CONFIG) as source:
+        with open(self.conf_path) as source:
             base_conf = parse_content(source.read())
         try:
             program = next(ele for ele in extract_prog_tuples(base_conf)

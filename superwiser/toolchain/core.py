@@ -2,14 +2,13 @@ from kazoo.client import KazooClient
 from kazoo.recipe.watchers import DataWatch
 from kazoo.protocol.states import EventType
 
-from superwiser.common.settings import ZK_HOST, ZK_PORT
 from superwiser.common.path import PathMaker
 from superwiser.common.log import logger
 
 
 class Orc(object):
-    def __init__(self, supervisor):
-        self.zk = KazooClient('{}:{}'.format(ZK_HOST, ZK_PORT))
+    def __init__(self, host, port, supervisor):
+        self.zk = KazooClient('{}:{}'.format(host, port))
         self.path = PathMaker()
         self.supervisor = supervisor
         self.setup()

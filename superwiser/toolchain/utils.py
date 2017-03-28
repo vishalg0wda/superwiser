@@ -1,20 +1,29 @@
-import os
+from os import path
+import shutil
 import subprocess
 
-from superwiser.common.settings import CONF_DIR
 from superwiser.common.log import logger
+from superwiser.toolchain.settings import CONF_TEMPLATE
 
 
 class Conf(object):
-    def __init__(self, main_path, include_path):
+    def __init__(self, main_path):
         self.main_path = main_path
-        self.include_path = include_path
+        self.include_path = path.join(path.dirname(main_path), 'magic.ini')
         self.setup()
 
+    @staticmethod
+    def create(conf_path):
+        if not path.exists(conf_path):
+            logger.info('Generating conf from template')
+            # Copy main conf
+            shutil.copyfile(CONF_TEMPLATE, conf_path)
+            # Touch magic conf
+            open(path.join(path.dirname(conf_path), 'magic.ini'), 'w').close()
+        return Conf(conf_path)
+
     def setup(self):
-        # Setup conf dir
-        if not os.path.exists(CONF_DIR):
-            os.makedirs(CONF_DIR)
+        assert path.exists(self.main_path), "Conf does not exist!"
         # Truncate conf
         self.truncate()
 

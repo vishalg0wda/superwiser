@@ -1,7 +1,6 @@
-from os.path import dirname, abspath, join
+from os.path import dirname, abspath
 
 ROOT_DIR = dirname(dirname(abspath(__file__)))
-CONF_DIR = join(ROOT_DIR, "conf")
 
 SERVICE_NAMESPACE = 'he-superwiser'
 ZK_HOST = 'localhost'

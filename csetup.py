@@ -1,8 +1,8 @@
 from setuptools import setup
 
-setup(name='he-superwiser',
+setup(name='he-superwiser-client',
       version='0.1',
-      description='Distributed job control across supervisors',
+      description='Client to run on each supervisor machine',
       url='https://github.com/farthVader91/superwiser/',
       author='Vishal Gowda',
       author_email='cartmanboy1991@gmail.com',
@@ -19,9 +19,9 @@ setup(name='he-superwiser',
       ],
       entry_points={
         'console_scripts': [
-            'superwiserd = superwiser.toolchain.mainloop:start_loop'],
+            'orcd = superwiser.toolchain.mainloop:start_loop'],
       },
       package_data={
-          'superwiser': ['conf/supervisord.conf', 'conf/magic.ini'],
+          'superwiser.toolchain': ['template.conf'],
       },
       zip_safe=False)

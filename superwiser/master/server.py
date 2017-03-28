@@ -1,8 +1,10 @@
+import optparse
+
 import requests
 from twisted.internet import reactor
 from twisted.internet.protocol import Protocol, Factory
 
-from superwiser.master.core import Sauron
+from superwiser.master.factory import SauronFactory
 from superwiser.master.settings import MASTER_PORT
 from superwiser.common.log import logger
 
@@ -59,8 +61,8 @@ class Superwiser(Protocol):
 
 
 class SuperwiserFactory(Factory):
-    def __init__(self):
-        self.overlord = Sauron()
+    def __init__(self, overlord):
+        self.overlord = overlord
 
     def buildProtocol(self, addr):
         prot = Superwiser()
@@ -71,8 +73,18 @@ class SuperwiserFactory(Factory):
         self.overlord.teardown()
 
 
+def parse_opts():
+    parser = optparse.OptionParser()
+    parser.add_option('-c', '--config', dest='conf_path')
+    parser.add_option('--zk-host')
+    parser.add_option('--zk-port')
+    options, _ = parser.parse_args()
+    return options.__dict__
+
+
 def start_server():
-    factory = SuperwiserFactory()
+    factory = SuperwiserFactory(
+        SauronFactory().make_sauron(**parse_opts()))
     reactor.listenTCP(MASTER_PORT, factory)
     logger.info('Starting server now')
     reactor.addSystemEventTrigger('before', 'shutdown', factory.teardown)
