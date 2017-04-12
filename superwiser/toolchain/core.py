@@ -4,23 +4,36 @@ from kazoo.protocol.states import EventType
 
 from superwiser.common.path import PathMaker
 from superwiser.common.log import logger
+from superwiser.toolchain.exceptions import GeneralOrcException
 
 
 class Orc(object):
-    def __init__(self, host, port, supervisor):
+    def __init__(self, host, port, supervisor, orc_host):
         self.zk = KazooClient('{}:{}'.format(host, port))
         self.path = PathMaker()
         self.supervisor = supervisor
+        self.orc_host = orc_host
         self.setup()
 
     def setup(self):
         logger.info('Setting up Orc')
         self.zk.start()
+
         # Setup ephemeral node
+        orc_conf_path = self.path.toolchain('orc')
         path = self.zk.create(
-            self.path.toolchain('orc'),
+            orc_conf_path,
             sequence=True,
             ephemeral=True)
+
+        # Put information about node
+        orc_node_path = self.path.node(path.split('/')[-1])
+        print orc_node_path
+        self.zk.create(
+            orc_node_path,
+            value=self.orc_host,
+            ephemeral=True)
+
         # Register watch
         DataWatch(
             self.zk,

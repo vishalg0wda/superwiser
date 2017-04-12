@@ -1,0 +1,27 @@
+<div>
+    <div>
+        <h4>Process List</h4>
+    </div>
+    <div style='font-family:"Raleway","Helvetica Neue",Helvetica,Arial,sans-serif;'>
+        <table class="table table-striped table-hover " id="process-table">
+            <thead>
+                <tr>
+                    <th>Process</th>
+                    <th>Command</th>
+                    <th>Process Count</th>
+                    <th>Process Weight</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for proc in all_procs %}
+                <tr>
+                    <td><a href="http://{{ proc.node }}:9001/" target="_blank">{{ proc.name }}</a></td>
+                    <td>{{ proc.command }}</td>
+                    <td>{{ proc.numprocs }}</td>
+                    <td>{{ proc.weight }}</td>
+                </tr>
+            {% endfor %}
+            <tbody>
+        <table>
+    </div>
+</div>

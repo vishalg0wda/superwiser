@@ -14,8 +14,10 @@ class OrcFactory(object):
         else:
             conf = Conf(conf_path)
         if zk_host is None:
-            zk_host = os.environ.get('zk_host', 'localhost')
+            zk_host = os.environ.get('ZK_HOST', 'localhost')
         if zk_port is None:
-            zk_port = os.environ.get('zk_port', 2181)
+            zk_port = os.environ.get('ZK_PORT', 2181)
+        orc_host = os.environ.get('ORC_HOST', '127.0.0.1')
+
         supervisor = Supervisor(conf)
-        return Orc(zk_host, zk_port, supervisor)
+        return Orc(zk_host, zk_port, supervisor, orc_host)

@@ -6,7 +6,7 @@ from superwiser.common.log import logger
 from superwiser.common.path import PathMaker
 from superwiser.common.parser import manipulate_numprocs, build_conf
 from superwiser.common.parser import parse_content, unparse
-from superwiser.common.parser import extract_prog_tuples
+from superwiser.common.parser import extract_prog_tuples, extract_programs
 from superwiser.master.distribute import distribute_work
 
 
@@ -31,6 +31,7 @@ class EyeOfMordor(object):
     def setup_paths(self):
         logger.info('Setting up paths')
         self.zk.ensure_path(self.path.toolchain())
+        self.zk.ensure_path(self.path.node())
         self.zk.ensure_path(self.path.conf())
 
     def register_watches(self):
@@ -89,6 +90,19 @@ class EyeOfMordor(object):
         logger.info('Tearing down the eye of Mordor!')
         self.zk.stop()
         self.zk.close()
+
+    def list_nodes(self):
+        return self.zk.get_children(self.path.node())
+
+    def list_processes(self, node):
+        node_conf_path = self.path.toolchain(node)
+        procs_str = self.zk.get(node_conf_path)[0]
+        procs = parse_content(procs_str)
+        procs = extract_programs(procs)
+        return procs
+
+    def get_node_details(self, node):
+        return self.zk.get(self.path.node(node))[0]
 
 
 class Sauron(object):
