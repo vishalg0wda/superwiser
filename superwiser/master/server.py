@@ -7,6 +7,7 @@ from yaml import load
 
 from superwiser.master.factory import SauronFactory
 from superwiser.master.settings import MASTER_PORT
+from superwiser.master.web import get_site_root
 from superwiser.common.log import logger
 
 
@@ -114,4 +115,9 @@ def start_server():
     reactor.listenTCP(MASTER_PORT, factory)
     logger.info('Starting server now')
     reactor.addSystemEventTrigger('before', 'shutdown', factory.teardown)
+
+    logger.info('Adding the web interface')
+    # Add the listner for the web interface
+    reactor.listenTCP(8080, get_site_root())
+
     reactor.run()

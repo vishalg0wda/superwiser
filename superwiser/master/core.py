@@ -31,6 +31,7 @@ class EyeOfMordor(object):
     def setup_paths(self):
         logger.info('Setting up paths')
         self.zk.ensure_path(self.path.toolchain())
+        self.zk.ensure_path(self.path.node())
         self.zk.ensure_path(self.path.conf())
 
     def register_watches(self):

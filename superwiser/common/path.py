@@ -11,5 +11,11 @@ class PathMaker(object):
             path = "{}/{}".format(path, name)
         return path
 
+    def node(self, name=None):
+        path = "{}/nodes".format(self.namespace())
+        if name is not None:
+            path = "{}/{}".format(path, name)
+        return path
+
     def conf(self):
         return "{}/conf".format(self.namespace())
