@@ -80,15 +80,14 @@ def parse_opts():
     parser.add_option('--master-conf', dest='master_conf')
     parser.add_option('--supervisor-conf', dest='supervisor_conf')
     parser.add_option('--zk-host', dest='zookeeper_host')
-    parser.add_option('--zk-port', 'zookeeper_port')
+    parser.add_option('--zk-port', dest='zookeeper_port')
     parser.add_option('--auto-redistribute',
                       action='store_true',
-                      default=False,
                       dest='auto_redistribute_on_failure')
     parser.add_option('--node-drop-callback',
                       action='append',
                       dest='node_drop_callback')
-    return parser.parse_args[0]
+    return parser.parse_args()[0]
 
 
 def build_conf(options):
@@ -97,26 +96,23 @@ def build_conf(options):
     # Extract master conf
     master_conf = options.master_conf
     if master_conf:
-        conf = master_conf
+        conf = load(open(master_conf))
     # Apply specified parameters as overrides
-    for k, v
-    retur
-    # Build conf from master-conf
-    if parser.master_conf:
-        conf = load(open(parser.master_conf))
-    # Apply overrides
-
+    overrides = {k: v for k, v in options.__dict__.items() if k not in conf}
+    conf.update(overrides)
+    return conf
 
 
 def start_server():
     config = build_conf(parse_opts())
-    factory = SuperwiserFactory(
-        SauronFactory().make_sauron(**config))
+    sauron = SauronFactory.make_sauron(**config)
+    factory = SuperwiserFactory(sauron)
     reactor.listenTCP(MASTER_PORT, factory)
     logger.info('Starting server now')
     reactor.addSystemEventTrigger('before', 'shutdown', factory.teardown)
 
     logger.info('Adding the web interface')
+
     # Add the listner for the web interface
     reactor.listenTCP(8080, get_site_root())
 
