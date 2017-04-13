@@ -8,6 +8,7 @@
                 <tr>
                     <th>Process</th>
                     <th>Command</th>
+                    <th>Nodes</th>
                     <th>Process Count</th>
                     <th>Process Weight</th>
                 </tr>
@@ -15,13 +16,29 @@
             <tbody>
             {% for proc in all_procs %}
                 <tr>
-                    <td><a href="http://{{ proc.node }}:9001/" target="_blank">{{ proc.name }}</a></td>
+                    <td>{{ proc.name }}</td>
                     <td>{{ proc.command }}</td>
+                    <td>
+                    {% for node in proc.nodes %}
+                        <a href="http://{{ node.node_ip }}:9001/" target="_blank">{{ node.name }}</a>
+                    {% endfor %}
+                    </td>
                     <td>{{ proc.numprocs }}</td>
                     <td>{{ proc.weight }}</td>
                 </tr>
             {% endfor %}
-            <tbody>
-        <table>
+            </tbody>
+        </table>
+    </div>
+    
+    <div style="margin-top: 20px;" class="col-lg-3 col-md-3 col-sm-12">
+        <ul class="list-group">
+            {% for node in all_nodes %}
+            <li class="list-group-item">
+            <span class="badge">{{ node.node_ip }}</span>
+                {{ node.name }}
+            </li>
+            {% endfor %}
+        </ul>
     </div>
 </div>

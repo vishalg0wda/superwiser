@@ -12,23 +12,38 @@ class SuperwiserHome(Resource):
         self.template_manager = JinjaTemplateManager()
         self.sauron = sauron
 
-    def get_all_node_procs(self):
-        all_procs = []
+    def get_process_states(self):
+        all_procs = {}
+        all_nodes = []
 
+        # Gather all the node details
         nodes = self.sauron.eye.list_nodes()
         for node in nodes:
-            procs = self.sauron.eye.list_processes(node)
-            node_ip = self.sauron.eye.get_node_details(node)
+            all_nodes.append({
+                'name': node,
+                'node_ip': self.sauron.eye.get_node_details(node)
+            })
+
+        # Gather all the process details for each node
+        for node in all_nodes:
+            procs = self.sauron.eye.list_processes(node['name'])
             for proc in procs:
+                num_procs = procs[proc]['numprocs']
+                if proc in all_procs:
+                    all_procs[proc]['numprocs'] += num_procs
+                    all_procs[proc]['nodes'].append(node)
+                    continue
                 proc_details = {}
                 proc_details.update(procs[proc])
                 proc_details['name'] = proc
-                proc_details['node'] = node_ip
-                all_procs.append(proc_details)
-        return all_procs
+                proc_details['nodes'] = [node]
+                all_procs[proc] = proc_details
+        return all_procs, all_nodes
 
     def render_GET(self, request):
-        context = {'all_procs': self.get_all_node_procs()}
+        all_procs, all_nodes = self.get_process_states()
+        context = {'all_procs': all_procs.values(),
+                   'all_nodes': all_nodes}
         return self.template_manager.render_template('index.html',
                                                      context)
 
