@@ -1,3 +1,6 @@
+import os
+
+import requests
 from kazoo.client import KazooClient
 from kazoo.recipe.watchers import DataWatch, ChildrenWatch
 from kazoo.protocol.states import EventType
@@ -11,10 +14,11 @@ from superwiser.master.distribute import distribute_work
 
 
 class EyeOfMordor(object):
-    def __init__(self, host, port, auto_redistribute):
+    def __init__(self, host, port, auto_redistribute, node_drop_callbacks):
         self.zk = KazooClient('{}:{}'.format(host, port))
         self.path = PathMaker()
         self.auto_redistribute = auto_redistribute
+        self.node_drop_callbacks = node_drop_callbacks
         self.toolchains = []
         self.setup()
 
@@ -71,6 +75,10 @@ class EyeOfMordor(object):
                 self.zk.get_children(self.path.toolchain()))
         elif removed:
             logger.info('Toolchain left')
+            # Hit callbacks
+            for url in self.node_drop_callbacks:
+                requests.post(url,
+                              data={'node_count': len(children)})
             if self.auto_redistribute:
                 self.distribute(
                     self.get_conf(),
@@ -205,3 +213,38 @@ class Sauron(object):
     def teardown(self):
         logger.info('Tearing down Sauron')
         self.eye.teardown()
+
+
+class SauronFactory(object):
+    _instance = None
+
+    def make_sauron(self, **kwargs):
+        inst = SauronFactory._instance
+        if inst is None:
+            logger.info('Making Sauron')
+
+            zk_host = kwargs['zookeeper_host']
+            zk_port = kwargs['zookeeper_port']
+            auto_redistribute = kwargs['auto_redistribute_on_failure']
+            node_drop_callbacks = kwargs['node_drop_callbacks']
+            supervisor_conf = kwargs['supervisor_conf']
+
+            if supervisor_conf is None:
+                supervisor_conf = self.touch_supervisor_conf()
+
+            inst = Sauron(
+                supervisor_conf,
+                EyeOfMordor(
+                    host=zk_host,
+                    port=zk_port,
+                    auto_redistribute=auto_redistribute,
+                    node_drop_callbacks=node_drop_callbacks))
+
+            SauronFactory._instance = inst
+
+        return inst
+
+    def touch_supervisor_conf(self):
+        path = os.path.join(os.getcwd(), 'aggregate.conf')
+        open(path, 'w').close()
+        return path
