@@ -6,11 +6,17 @@ from superwiser.common.jinja_manager import JinjaTemplateManager
 
 
 class SuperwiserHome(Resource):
-    isLeaf = True
+    isLeaf = False
 
     def __init__(self, sauron):
+        Resource.__init__(self)
         self.template_manager = JinjaTemplateManager()
         self.sauron = sauron
+
+    def getChild(self, name, request):
+        if name == '':
+            return self
+        return Resource.getChild(self, name, request)
 
     def get_process_states(self):
         all_procs = {}
@@ -48,9 +54,63 @@ class SuperwiserHome(Resource):
                                                      context)
 
 
+class SuperwiserAPI(Resource):
+    isLeaf = True
+
+    def __init__(self, sauron):
+        self.sauron = sauron
+        self.actions = [
+            'start',
+            'restart',
+            'stop',
+            'incr',
+            'decr'
+        ]
+
+
+    def render_POST(self, request):
+        post_args = request.args
+
+        # We do all the basic validations of the api params
+        if 'action' not in post_args:
+            request.setResponseCode(400)
+            return 'Bad Request, action parameter missing'
+
+        # Check if action is in the list of valid actions
+        action = post_args['action'][0]
+        if action not in self.actions:
+            request.setResponseCode(400)
+            msg = "Bad request, action parameter should be "
+            msg += ' '.join(self.actions)
+            return msg
+
+        # All actions require a program name
+        if 'program' not in post_args:
+            request.setResponseCode(400)
+            return 'Bad Request, program parameter missing'
+
+        # Actions increment and decrement require and extra parameter count
+        if action in ['incr', 'decr'] and 'count' not in post_args:
+            request.setResponseCode(400)
+            return 'Bad Request, count parameter missing'
+
+        if action == 'start':
+            self.sauron.start_program(post_args['program'])
+
+        #WRITE OTHER ACTIONS HERE
+
+
+
+
+        print request.args['action']
+        print request.args['prog-name']
+        return 'OK'
+
+
 class SuperwiserWebFactory(object):
     def make_site(self, sauron):
         root = SuperwiserHome(sauron)
+        root.putChild('action', SuperwiserAPI(sauron))
         site = Site(root)
         return site
 
@@ -114,3 +174,5 @@ class SuperwiserTCPFactory(Factory):
         prot = SuperwiserTCP()
         prot.overlord = self.overlord
         return prot
+
+
