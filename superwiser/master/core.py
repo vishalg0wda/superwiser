@@ -1,5 +1,3 @@
-import os
-
 import requests
 from kazoo.client import KazooClient
 from kazoo.recipe.watchers import DataWatch, ChildrenWatch
@@ -36,16 +34,18 @@ class EyeOfMordor(object):
         logger.info('Setting up paths')
         self.zk.ensure_path(self.path.toolchain())
         self.zk.ensure_path(self.path.node())
-        self.zk.ensure_path(self.path.conf())
+        self.zk.ensure_path(self.path.baseconf())
+        self.zk.ensure_path(self.path.stateconf())
 
     def register_watches(self):
         logger.info('Registering watches')
-        DataWatch(self.zk, self.path.conf(), self.on_conf_change)
+        DataWatch(self.zk, self.path.baseconf(), self.on_base_conf_change)
+        DataWatch(self.zk, self.path.stateconf(), self.on_state_conf_change)
         ChildrenWatch(
             self.zk, self.path.toolchain(),
             self.on_toolchains, send_event=True)
 
-    def distribute(self, work, toolchains):
+    def _distribute(self, work, toolchains):
         # Distribute conf across toolchains
         assigned_work = distribute_work(work, toolchains)
         for (toolchain, awork) in assigned_work.items():
@@ -53,15 +53,37 @@ class EyeOfMordor(object):
                 self.path.toolchain(toolchain),
                 unparse(build_conf(awork, parse_content(work))))
 
-    def on_conf_change(self, data, stat, event):
+    def distribute(self):
+        self._distribute(
+            self.get_state_conf(),
+            self.zk.get_children(self.path.toolchain()))
+
+    def on_base_conf_change(self, data, stat, event):
         if event and event.type == EventType.CHANGED:
-            logger.info('Handling conf change')
+            logger.info('Handling base conf change')
+            state_programs = dict(
+                (k, v) for k, v, _ in extract_prog_tuples(
+                    parse_content(self.get_state_conf())))
+            base_conf = parse_content(data)
+            base_tuples = extract_prog_tuples(base_conf)
+            # Rebuild state conf
+            prog_tuples = []
+            for (program_name, numprocs, weight) in base_tuples:
+                prog_tuples.append(
+                    (program_name,
+                     state_programs.get(program_name, numprocs),
+                     weight))
+            # Trigger distribute
+            self.set_state_conf(unparse(build_conf(prog_tuples, base_conf)))
+
+    def on_state_conf_change(self, data, stat, event):
+        if event and event.type == EventType.CHANGED:
+            logger.info('Handling state conf change')
             # Get toolchains
-            children = self.zk.get_children(self.path.toolchain())
-            toolchains = [ele.split('/')[-1] for ele in children]
+            toolchains = self.zk.get_children(self.path.toolchain())
             if toolchains:
                 # Distribute work across toolchains
-                self.distribute(data, toolchains)
+                self._distribute(data, toolchains)
 
     def on_toolchains(self, children, event):
         if not event:
@@ -70,9 +92,7 @@ class EyeOfMordor(object):
         removed = set(self.toolchains) - set(children)
         if added:
             logger.info('Toolchain joined')
-            self.distribute(
-                self.get_conf(),
-                self.zk.get_children(self.path.toolchain()))
+            self.distribute()
         elif removed:
             logger.info('Toolchain left')
             # Hit callbacks
@@ -80,19 +100,26 @@ class EyeOfMordor(object):
                 requests.post(url,
                               data={'node_count': len(children)})
             if self.auto_redistribute:
-                self.distribute(
-                    self.get_conf(),
-                    self.zk.get_children(self.path.toolchain()))
+                self.distribute()
         self.toolchains = children
 
-    def set_conf(self, conf):
-        logger.info('Updating conf')
-        self.zk.set(self.path.conf(), conf)
-
-    def get_conf(self):
-        logger.info('Getting conf')
-        data, stat = self.zk.get(self.path.conf())
+    def get_base_conf(self):
+        logger.info('Getting base conf')
+        data, _ = self.zk.get(self.path.baseconf())
         return data
+
+    def set_base_conf(self, conf):
+        logger.info('Updating base conf')
+        self.zk.set(self.path.baseconf(), conf)
+
+    def get_state_conf(self):
+        logger.info('Getting state conf')
+        data, _ = self.zk.get(self.path.stateconf())
+        return data
+
+    def set_state_conf(self, conf):
+        logger.info('Updating state conf')
+        self.zk.set(self.path.stateconf(), conf)
 
     def teardown(self):
         logger.info('Tearing down the eye of Mordor!')
@@ -114,24 +141,20 @@ class EyeOfMordor(object):
 
 
 class Sauron(object):
-    def __init__(self, conf_path, eye):
-        self.conf_path = conf_path
+    def __init__(self, eye, conf=None):
         self.eye = eye
+        self.conf = conf
         self.setup()
 
     def setup(self):
         logger.info('Setting up Sauron')
-        # Set base conf
-        # Note: this will trigger a distribute
-        with open(self.conf_path) as source:
-            self.eye.set_conf(source.read())
-
-    def update_conf(self, conf):
-        logger.info('Updating conf')
-        self.eye.set_conf(conf)
-        # Also update the file at conf_path
-        with open(self.conf_path, 'w') as dest:
-            dest.write(conf)
+        # Override previous state of conf
+        if self.conf is not None:
+            # Note: this will trigger a distribute
+            self.eye.set_base_conf(self.conf)
+        else:
+            # Trigger a distribute anyway
+            self.eye.distribute()
 
     def increase_procs(self, program_name, factor=1):
         logger.info('Increasing procs')
@@ -140,11 +163,11 @@ class Sauron(object):
             return x + factor
 
         new_conf = manipulate_numprocs(
-            parse_content(self.eye.get_conf()),
+            parse_content(self.eye.get_state_conf()),
             program_name,
             adder)
         # Simply set the conf to trigger a distribute and sync
-        self.eye.set_conf(new_conf)
+        self.eye.set_state_conf(new_conf)
 
     def decrease_procs(self, program_name, factor=1):
         logger.info('Decreasing procs')
@@ -153,43 +176,42 @@ class Sauron(object):
             return x - factor
 
         new_conf = manipulate_numprocs(
-            parse_content(self.eye.get_conf()),
+            parse_content(self.eye.get_state_conf()),
             program_name,
             subtractor)
         # Simply set the conf to trigger a distribute and sync
-        self.eye.set_conf(new_conf)
+        self.eye.set_state_conf(new_conf)
 
     def start_program(self, program_name):
-        logger.info('Starting program')
-        # First check if program is defined in base conf
-        with open(self.conf_path) as source:
-            base_conf = parse_content(source.read())
-        try:
-            program = next(ele for ele in extract_prog_tuples(base_conf)
-                           if ele[0] == program_name)
-        except StopIteration:
-            logger.info('Program is not defined')
-            return False
         prog_tuples = extract_prog_tuples(
-            parse_content(self.eye.get_conf()))
+            parse_content(self.eye.get_state_conf()))
         has_program = any(ele for ele in prog_tuples
                           if ele[0] == program_name)
         if has_program:
             logger.info('Already contains program')
             return False
+        base_conf_tuples = extract_prog_tuples(
+            parse_content(self.eye.get_base_conf()))
+        try:
+            program_tuple = next(ele for ele in base_conf_tuples
+                                 if ele[0] == program_name)
+        except StopIteration:
+            logger.info('Program does not exist')
+            return False
         # Program did not exist, let's add it now
-        prog_tuples.append(program)
+        # Note: We set numprocs to one while adding
+        prog_tuples.append(program_tuple)
         # Update conf and distribute
-        self.eye.set_conf(
+        self.eye.set_state_conf(
             unparse(
                 build_conf(
                     prog_tuples,
-                    base_conf)))
+                    parse_content(self.eye.get_base_conf()))))
         return True
 
     def stop_program(self, program_name):
         logger.info('Stopping program')
-        conf = parse_content(self.eye.get_conf())
+        conf = parse_content(self.eye.get_state_conf())
         # Check if program exists
         prog_tuples = extract_prog_tuples(conf)
         for (pos, (prog_name, _, _)) in enumerate(prog_tuples):
@@ -197,9 +219,9 @@ class Sauron(object):
                 del prog_tuples[pos]
                 break
         else:
-            logger.info('Program is either stopped/not been defined')
+            logger.info('Program is either already stopped/not defined')
             return False
-        self.eye.set_conf(
+        self.eye.set_state_conf(
             unparse(
                 build_conf(
                     prog_tuples,
@@ -229,22 +251,22 @@ class SauronFactory(object):
             node_drop_callbacks = kwargs['node_drop_callbacks']
             supervisor_conf = kwargs['supervisor_conf']
 
-            if supervisor_conf is None:
-                supervisor_conf = self.touch_supervisor_conf()
+            if supervisor_conf is not None:
+                supervisor_conf = self.read_conf(supervisor_conf)
 
             inst = Sauron(
-                supervisor_conf,
                 EyeOfMordor(
                     host=zk_host,
                     port=zk_port,
                     auto_redistribute=auto_redistribute,
-                    node_drop_callbacks=node_drop_callbacks))
+                    node_drop_callbacks=node_drop_callbacks),
+                supervisor_conf)
 
             SauronFactory._instance = inst
 
         return inst
 
-    def touch_supervisor_conf(self):
-        path = os.path.join(os.getcwd(), 'aggregate.conf')
-        open(path, 'w').close()
-        return path
+    def read_conf(self, path):
+        logger.info('Reading conf')
+        with open(path) as source:
+            return source.read()
