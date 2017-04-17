@@ -1,3 +1,5 @@
+import requests
+
 from twisted.web.server import Site
 from twisted.web.resource import Resource
 from twisted.internet.protocol import Protocol, Factory

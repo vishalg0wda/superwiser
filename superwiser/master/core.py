@@ -190,9 +190,17 @@ class Sauron(object):
         if has_program:
             logger.info('Already contains program')
             return False
+        base_conf_tuples = extract_prog_tuples(
+            parse_content(self.eye.get_base_conf()))
+        try:
+            program_tuple = next(ele for ele in base_conf_tuples
+                                 if ele[0] == program_name)
+        except StopIteration:
+            logger.info('Program does not exist')
+            return False
         # Program did not exist, let's add it now
         # Note: We set numprocs to one while adding
-        prog_tuples.append((program_name, 1, None))
+        prog_tuples.append(program_tuple)
         # Update conf and distribute
         self.eye.set_state_conf(
             unparse(
