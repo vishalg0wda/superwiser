@@ -4,7 +4,6 @@ from kazoo.protocol.states import EventType
 
 from superwiser.common.path import PathMaker
 from superwiser.common.log import logger
-from superwiser.toolchain.exceptions import GeneralOrcException
 
 
 class Orc(object):
