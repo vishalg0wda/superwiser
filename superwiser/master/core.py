@@ -45,7 +45,7 @@ class EyeOfMordor(object):
             self.zk, self.path.toolchain(),
             self.on_toolchains, send_event=True)
 
-    def distribute(self, work, toolchains):
+    def _distribute(self, work, toolchains):
         # Distribute conf across toolchains
         assigned_work = distribute_work(work, toolchains)
         for (toolchain, awork) in assigned_work.items():
@@ -53,31 +53,37 @@ class EyeOfMordor(object):
                 self.path.toolchain(toolchain),
                 unparse(build_conf(awork, parse_content(work))))
 
+    def distribute(self):
+        self._distribute(
+            self.get_state_conf(),
+            self.zk.get_children(self.path.toolchain()))
+
     def on_base_conf_change(self, data, stat, event):
         if event and event.type == EventType.CHANGED:
             logger.info('Handling base conf change')
-            state_programs = dict(extract_prog_tuples(
-                parse_content(self.get_state_conf())))
+            state_programs = dict(
+                (k, v) for k, v, _ in extract_prog_tuples(
+                    parse_content(self.get_state_conf())))
             base_conf = parse_content(data)
             base_tuples = extract_prog_tuples(base_conf)
             # Rebuild state conf
             prog_tuples = []
-            for (program_name, numprocs) in base_tuples:
+            for (program_name, numprocs, weight) in base_tuples:
                 prog_tuples.append(
                     (program_name,
-                     state_programs.get(program_name, 1)))
+                     state_programs.get(program_name, numprocs),
+                     weight))
             # Trigger distribute
-            self.set_state_conf(build_conf(prog_tuples, base_conf))
+            self.set_state_conf(unparse(build_conf(prog_tuples, base_conf)))
 
     def on_state_conf_change(self, data, stat, event):
         if event and event.type == EventType.CHANGED:
             logger.info('Handling state conf change')
             # Get toolchains
-            children = self.zk.get_children(self.path.toolchain())
-            toolchains = [ele.split('/')[-1] for ele in children]
+            toolchains = self.zk.get_children(self.path.toolchain())
             if toolchains:
                 # Distribute work across toolchains
-                self.distribute(data, toolchains)
+                self._distribute(data, toolchains)
 
     def on_toolchains(self, children, event):
         if not event:
@@ -86,9 +92,7 @@ class EyeOfMordor(object):
         removed = set(self.toolchains) - set(children)
         if added:
             logger.info('Toolchain joined')
-            self.distribute(
-                self.get_state_conf(),
-                self.zk.get_children(self.path.toolchain()))
+            self.distribute()
         elif removed:
             logger.info('Toolchain left')
             # Hit callbacks
@@ -96,9 +100,7 @@ class EyeOfMordor(object):
                 requests.post(url,
                               data={'node_count': len(children)})
             if self.auto_redistribute:
-                self.distribute(
-                    self.get_state_conf(),
-                    self.zk.get_children(self.path.toolchain()))
+                self.distribute()
         self.toolchains = children
 
     def get_base_conf(self):
@@ -111,7 +113,7 @@ class EyeOfMordor(object):
         self.zk.set(self.path.baseconf(), conf)
 
     def get_state_conf(self):
-        logger.info('Getting conf')
+        logger.info('Getting state conf')
         data, _ = self.zk.get(self.path.stateconf())
         return data
 
@@ -150,6 +152,9 @@ class Sauron(object):
         if self.conf is not None:
             # Note: this will trigger a distribute
             self.eye.set_base_conf(self.conf)
+        else:
+            # Trigger a distribute anyway
+            self.eye.distribute()
 
     def increase_procs(self, program_name, factor=1):
         logger.info('Increasing procs')
@@ -187,7 +192,7 @@ class Sauron(object):
             return False
         # Program did not exist, let's add it now
         # Note: We set numprocs to one while adding
-        prog_tuples.append((program_name, 1))
+        prog_tuples.append((program_name, 1, None))
         # Update conf and distribute
         self.eye.set_state_conf(
             unparse(
