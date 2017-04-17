@@ -26,7 +26,8 @@ def parse_opts():
                       dest='auto_redistribute_on_failure')
     parser.add_option('--node-drop-callback',
                       action='append',
-                      dest='node_drop_callbacks')
+                      dest='node_drop_callbacks',
+                      default=[])
     parser.add_option('--supervisor-conf', dest='supervisor_conf')
     return parser.parse_args()[0]
 
