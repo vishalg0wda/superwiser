@@ -17,5 +17,8 @@ class PathMaker(object):
             path = "{}/{}".format(path, name)
         return path
 
-    def conf(self):
-        return "{}/conf".format(self.namespace())
+    def baseconf(self):
+        return "{}/conf/base".format(self.namespace())
+
+    def stateconf(self):
+        return "{}/conf/state".format(self.namespace())
