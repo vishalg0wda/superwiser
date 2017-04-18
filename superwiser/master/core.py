@@ -188,6 +188,7 @@ class Sauron(object):
             adder)
         # Simply set the conf to trigger a distribute and sync
         self.eye.set_state_conf(new_conf)
+        return True
 
     def decrease_procs(self, program_name, factor=1):
         logger.info('Decreasing procs')
@@ -201,6 +202,7 @@ class Sauron(object):
             subtractor)
         # Simply set the conf to trigger a distribute and sync
         self.eye.set_state_conf(new_conf)
+        return True
 
     def start_program(self, program_name):
         prog_tuples = extract_prog_tuples(

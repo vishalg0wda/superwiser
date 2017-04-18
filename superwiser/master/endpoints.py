@@ -78,7 +78,6 @@ class SuperwiserAPI(Resource):
             'decr'
         ]
 
-
     def render_POST(self, request):
         post_args = request.args
 
@@ -105,23 +104,48 @@ class SuperwiserAPI(Resource):
             request.setResponseCode(400)
             return 'Bad Request, count parameter missing'
 
+        request.setResponseCode(200)
+        out = 'ERROR'
         if action == 'start':
-            self.sauron.start_program(post_args['program'])
+            try:
+                if self.sauron.start_program(post_args['program'][0]):
+                    out = 'OK'
+            except:
+                pass
+        elif action == 'stop':
+            try:
+                if self.sauron.stop_program(post_args['program'][0]):
+                    out = 'OK'
+            except:
+                pass
+        elif action == 'restart':
+            try:
+                if self.sauron.restart_program(post_args['program'][0]):
+                    out = 'OK'
+            except:
+                pass
+        elif action == 'incr':
+            try:
+                if self.sauron.increase_procs(
+                        post_args['program'][0], int(post_args['count'][0])):
+                    out = 'OK'
+            except:
+                pass
+        elif action == 'decr':
+            try:
+                if self.sauron.stop_program(
+                        post_args['program'][0], int(post_args['count'][0])):
+                    out = 'OK'
+            except:
+                pass
 
-        #WRITE OTHER ACTIONS HERE
-
-
-
-
-        print request.args['action']
-        print request.args['prog-name']
-        return 'OK'
+        return out
 
 
 class SuperwiserWebFactory(object):
     def make_site(self, sauron):
         root = SuperwiserHome(sauron)
-        root.putChild('action', SuperwiserAPI(sauron))
+        root.putChild('api', SuperwiserAPI(sauron))
         site = Site(root)
         return site
 
@@ -189,5 +213,3 @@ class SuperwiserTCPFactory(Factory):
         prot = SuperwiserTCP()
         prot.overlord = self.overlord
         return prot
-
-
