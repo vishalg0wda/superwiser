@@ -9,11 +9,17 @@ from superwiser.common.jinja_manager import JinjaTemplateManager
 
 
 class SuperwiserHome(Resource):
-    isLeaf = True
+    isLeaf = False
 
     def __init__(self, sauron):
+        Resource.__init__(self)
         self.template_manager = JinjaTemplateManager()
         self.sauron = sauron
+
+    def getChild(self, name, request):
+        if name == '':
+            return self
+        return Resource.getChild(self, name, request)
 
     def get_process_states(self):
         # Collect all node details
@@ -59,9 +65,87 @@ class SuperwiserHome(Resource):
                                                      context)
 
 
+class SuperwiserAPI(Resource):
+    isLeaf = True
+
+    def __init__(self, sauron):
+        self.sauron = sauron
+        self.actions = [
+            'start',
+            'restart',
+            'stop',
+            'incr',
+            'decr'
+        ]
+
+    def render_POST(self, request):
+        post_args = request.args
+
+        # We do all the basic validations of the api params
+        if 'action' not in post_args:
+            request.setResponseCode(400)
+            return 'Bad Request, action parameter missing'
+
+        # Check if action is in the list of valid actions
+        action = post_args['action'][0]
+        if action not in self.actions:
+            request.setResponseCode(400)
+            msg = "Bad request, action parameter should be "
+            msg += ' '.join(self.actions)
+            return msg
+
+        # All actions require a program name
+        if 'program' not in post_args:
+            request.setResponseCode(400)
+            return 'Bad Request, program parameter missing'
+
+        # Actions increment and decrement require and extra parameter count
+        if action in ['incr', 'decr'] and 'count' not in post_args:
+            request.setResponseCode(400)
+            return 'Bad Request, count parameter missing'
+
+        request.setResponseCode(200)
+        out = 'ERROR'
+        if action == 'start':
+            try:
+                if self.sauron.start_program(post_args['program'][0]):
+                    out = 'OK'
+            except:
+                pass
+        elif action == 'stop':
+            try:
+                if self.sauron.stop_program(post_args['program'][0]):
+                    out = 'OK'
+            except:
+                pass
+        elif action == 'restart':
+            try:
+                if self.sauron.restart_program(post_args['program'][0]):
+                    out = 'OK'
+            except:
+                pass
+        elif action == 'incr':
+            try:
+                if self.sauron.increase_procs(
+                        post_args['program'][0], int(post_args['count'][0])):
+                    out = 'OK'
+            except:
+                pass
+        elif action == 'decr':
+            try:
+                if self.sauron.stop_program(
+                        post_args['program'][0], int(post_args['count'][0])):
+                    out = 'OK'
+            except:
+                pass
+
+        return out
+
+
 class SuperwiserWebFactory(object):
     def make_site(self, sauron):
         root = SuperwiserHome(sauron)
+        root.putChild('api', SuperwiserAPI(sauron))
         site = Site(root)
         return site
 

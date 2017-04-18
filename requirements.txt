@@ -3,3 +3,4 @@ requests==2.13.0
 supervisor==3.3.1
 Twisted==17.1.0
 jinja2==2.9.6
+pyaml
