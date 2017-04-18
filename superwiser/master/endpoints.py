@@ -70,7 +70,11 @@ class SuperwiserTCP(Protocol):
     def parse_command(self, data):
         cmd, args = None, []
         try:
-            cmd, rest = data.split('(')
+            splits = data.split('(')
+            if len(splits) > 1:
+                cmd, rest = splits
+            else:
+                cmd = data.strip()
             if cmd in ['increase_procs', 'decrease_procs']:
                 prog, factor = rest.split(',')
                 prog = prog.strip()
@@ -109,12 +113,12 @@ class SuperwiserTCP(Protocol):
         elif cmd == 'restart_program':
             result = self.overlord.restart_program(*args)
             self.transport.write(str(result) + '\n')
+        elif cmd in ['quit', 'exit']:
+            self.transport.write('Goodbye\n')
+            self.transport.loseConnection()
 
     def connectionMade(self):
-        self.transport.write('Hello\n')
-
-    def connectionLost(self, reason):
-        self.transport.write('Goodbye\n')
+        self.transport.write("It's time to be super wiser\n")
 
 
 class SuperwiserTCPFactory(Factory):
