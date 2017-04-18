@@ -71,11 +71,14 @@ def toggle_ceils():
 
 
 def split_work(work, across):
+    allotted = []
+    if across == 0:
+        logger.info('Nothing to split work across')
+        return allotted
     total_load = sum(ele[1] * ele[2] for ele in work)
     mean_load = total_load / across
     # Sort work in descending order of load
     work = sorted(work, key=lambda e: e[1] * e[2], reverse=True)
-    allotted = []
     # Toggle ceiling of mean loads
     toggler = toggle_ceils()
     toggler.send(None)

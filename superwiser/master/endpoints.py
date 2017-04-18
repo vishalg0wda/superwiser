@@ -1,4 +1,5 @@
 import requests
+from collections import defaultdict
 
 from twisted.web.server import Site
 from twisted.web.resource import Resource
@@ -21,37 +22,45 @@ class SuperwiserHome(Resource):
         return Resource.getChild(self, name, request)
 
     def get_process_states(self):
-        all_procs = {}
-        all_nodes = []
+        # Collect all node details
+        orcs = [
+            {
+                'name': orc,
+                'node_ip': self.sauron.eye.get_orc_ip(orc),
+            } for orc in self.sauron.eye.list_orcs()]
 
-        # Gather all the node details
-        nodes = self.sauron.eye.list_nodes()
-        for node in nodes:
-            all_nodes.append({
-                'name': node,
-                'node_ip': self.sauron.eye.get_node_details(node)
-            })
+        # Map process to all orcs that it is running in
+        proc_orc_map = defaultdict(list)
+        for orc in orcs:
+            procs = self.sauron.eye.list_processes_for_orc(orc['name'])
+            for (proc_name, _, _) in procs:
+                proc_orc_map[proc_name].append(orc)
 
-        # Gather all the process details for each node
-        for node in all_nodes:
-            procs = self.sauron.eye.list_processes(node['name'])
-            for proc in procs:
-                num_procs = procs[proc]['numprocs']
-                if proc in all_procs:
-                    all_procs[proc]['numprocs'] += num_procs
-                    all_procs[proc]['nodes'].append(node)
-                    continue
-                proc_details = {}
-                proc_details.update(procs[proc])
-                proc_details['name'] = proc
-                proc_details['nodes'] = [node]
-                all_procs[proc] = proc_details
-        return all_procs, all_nodes
+        # Collect all process details
+        processes = [
+            {
+                'name': name,
+                'command': ele['command'],
+                'nodes': proc_orc_map[name],
+                'numprocs': ele['numprocs'],
+                'weight': ele['weight'],
+                'running': True,
+            } for (name, ele) in self.sauron.eye.list_processes().items()]
+        # Include all stopped processes as well
+        stopped_processes = self.sauron.eye.get_stopped_processes()
+        # Patch it to include nodes and running keys
+        for proc in stopped_processes:
+            proc['nodes'] = []
+            proc['running'] = False
+        # Concatenate the two lists
+        processes.extend(stopped_processes)
+
+        return processes, orcs
 
     def render_GET(self, request):
-        all_procs, all_nodes = self.get_process_states()
-        context = {'all_procs': all_procs.values(),
-                   'all_nodes': all_nodes}
+        processes, orcs = self.get_process_states()
+        context = {'all_procs': processes,
+                   'all_nodes': orcs}
         return self.template_manager.render_template('index.html',
                                                      context)
 

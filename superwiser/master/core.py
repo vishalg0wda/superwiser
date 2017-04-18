@@ -61,18 +61,22 @@ class EyeOfMordor(object):
     def on_base_conf_change(self, data, stat, event):
         if event and event.type == EventType.CHANGED:
             logger.info('Handling base conf change')
-            state_programs = dict(
-                (k, v) for k, v, _ in extract_prog_tuples(
-                    parse_content(self.get_state_conf())))
+            state_programs = {
+                name: (numprocs, weight)
+                for name, numprocs, weight in extract_prog_tuples(
+                        parse_content(self.get_state_conf()))}
             base_conf = parse_content(data)
             base_tuples = extract_prog_tuples(base_conf)
             # Rebuild state conf
             prog_tuples = []
             for (program_name, numprocs, weight) in base_tuples:
-                prog_tuples.append(
-                    (program_name,
-                     state_programs.get(program_name, numprocs),
-                     weight))
+                tup = (program_name, )
+                if program_name in state_programs:
+                    tup += state_programs[program_name]
+                else:
+                    tup += (numprocs, weight)
+
+                prog_tuples.append(tup)
             # Trigger distribute
             self.set_state_conf(unparse(build_conf(prog_tuples, base_conf)))
 
@@ -126,18 +130,34 @@ class EyeOfMordor(object):
         self.zk.stop()
         self.zk.close()
 
-    def list_nodes(self):
-        return self.zk.get_children(self.path.node())
+    def list_orcs(self):
+        return self.zk.get_children(self.path.toolchain())
 
-    def list_processes(self, node):
-        node_conf_path = self.path.toolchain(node)
-        procs_str = self.zk.get(node_conf_path)[0]
-        procs = parse_content(procs_str)
-        procs = extract_programs(procs)
-        return procs
+    def get_orc_ip(self, orc):
+        return self.zk.get(self.path.node(orc))[0]
 
-    def get_node_details(self, node):
-        return self.zk.get(self.path.node(node))[0]
+    def list_processes_for_orc(self, orc):
+        return extract_prog_tuples(
+            parse_content(self.zk.get(self.path.toolchain(orc))[0]))
+
+    def list_processes(self):
+        return extract_programs(parse_content(self.get_state_conf()))
+
+    def get_stopped_processes(self):
+        base_tups = extract_prog_tuples(
+            parse_content(self.get_base_conf()))
+        state_tups = extract_prog_tuples(
+            parse_content(self.get_state_conf()))
+        base_progs = set(ele[0] for ele in base_tups)
+        state_progs = set(ele[0] for ele in state_tups)
+        stopped_progs = (base_progs - state_progs)
+        base_conf = extract_programs(parse_content(self.get_base_conf()))
+        out = []
+        for (name, body) in base_conf.items():
+            if name in stopped_progs:
+                body['name'] = name
+                out.append(body)
+        return out
 
 
 class Sauron(object):
