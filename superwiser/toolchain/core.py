@@ -4,39 +4,47 @@ from kazoo.protocol.states import EventType
 
 from superwiser.common.path import PathMaker
 from superwiser.common.log import logger
+from superwiser.toolchain.utils import NameGenerator
 
 
 class Orc(object):
     def __init__(self, host, port, supervisor, orc_host):
         self.zk = KazooClient('{}:{}'.format(host, port))
         self.path = PathMaker()
+        self.name_gen = NameGenerator()
+        self.name = None
         self.supervisor = supervisor
         self.orc_host = orc_host
         self.setup()
 
-    def setup(self):
-        logger.info('Setting up Orc')
-        self.zk.start()
-
-        # Setup ephemeral node
-        orc_conf_path = self.path.toolchain('orc')
-        path = self.zk.create(
-            orc_conf_path,
-            sequence=True,
-            ephemeral=True)
-
+    def setup_nodes(self):
+        # Setup ephemeral nodes
+        lock = self.zk.Lock(self.path.namelock())
+        with lock:
+            used_names = self.zk.get_children(self.path.toolchain())
+            new_name = self.name_gen.generate()
+            while new_name in used_names:
+                new_name = self.name_gen.generate()
+            self.name = new_name
+            # Setup path for conf synchronization
+            self.zk.create(
+                self.path.toolchain(new_name),
+                ephemeral=True)
         # Put information about node
-        orc_node_path = self.path.node(path.split('/')[-1])
-        print orc_node_path
         self.zk.create(
-            orc_node_path,
+            self.path.node(self.name),
             value=self.orc_host,
             ephemeral=True)
 
+    def setup(self):
+        logger.info('Setting up Orc')
+        self.zk.start()
+        # Setup nodes
+        self.setup_nodes()
         # Register watch
         DataWatch(
             self.zk,
-            path,
+            self.path.toolchain(self.name),
             self.on_sync)
 
     def on_sync(self, data, stat, event):

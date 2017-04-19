@@ -1,9 +1,11 @@
-from os import path
+import random
 import shutil
 import subprocess
+from os import path
 
 from superwiser.common.log import logger
 from superwiser.toolchain.settings import CONF_TEMPLATE
+from superwiser.toolchain.constants import ADJECTIVES, ORC_NAMES
 
 
 class Conf(object):
@@ -81,3 +83,13 @@ class Supervisor(object):
     def teardown(self):
         logger.info('tearing down')
         self.stop()
+
+
+class NameGenerator(object):
+    LEFT = ADJECTIVES
+    RIGHT = ORC_NAMES
+
+    def generate(self):
+        name = "{} {}".format(
+            random.choice(self.LEFT), random.choice(self.RIGHT))
+        return name.title()

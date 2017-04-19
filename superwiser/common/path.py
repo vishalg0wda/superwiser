@@ -22,3 +22,6 @@ class PathMaker(object):
 
     def stateconf(self):
         return "{}/conf/state".format(self.namespace())
+
+    def namelock(self):
+        return "{}/namelock".format(self.namespace())
