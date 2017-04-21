@@ -176,6 +176,10 @@ class Sauron(object):
             # Trigger a distribute anyway
             self.eye.distribute()
 
+    def update_conf(self, conf):
+        logger.info('Updating conf')
+        self.eye.set_base_conf(conf)
+
     def increase_procs(self, program_name, factor=1):
         logger.info('Increasing procs')
 
