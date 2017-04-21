@@ -22,4 +22,7 @@ setup(name='he-superwiser-master',
         'console_scripts': [
             'saurond = superwiser.master.server:start_server'],
       },
+      package_data={
+          'superwiser.master': ['templates/*'],
+      },
       zip_safe=False)
