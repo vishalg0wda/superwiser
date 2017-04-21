@@ -1,8 +1,10 @@
 import requests
 from collections import defaultdict
+import os
 
 from twisted.web.server import Site
 from twisted.web.resource import Resource
+from twisted.web.static import File
 from twisted.internet.protocol import Protocol, Factory
 
 from superwiser.common.jinja_manager import JinjaTemplateManager
@@ -144,8 +146,10 @@ class SuperwiserAPI(Resource):
 
 class SuperwiserWebFactory(object):
     def make_site(self, sauron):
+        static_dir = os.getcwd() + '/superwiser/master/static/'
         root = SuperwiserHome(sauron)
         root.putChild('api', SuperwiserAPI(sauron))
+        root.putChild('static', File(static_dir))
         site = Site(root)
         return site
 
