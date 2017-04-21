@@ -1,0 +1,64 @@
+body {
+    background-color: #13232B;
+}
+
+hr {
+    border-top: 3px solid #e4e4e4;
+}
+
+.action {
+    cursor: pointer;
+}
+
+.disable {
+    color: darkGray;
+    pointer-events: none;
+    cursor: default;
+}
+
+#main {
+    background-color:#F0F0F0;
+    height: auto;
+    font-family: 'Open Sans', sans-serif
+}
+
+#header {
+    margin-bottom: 30px;
+    margin-left: 15px;
+    margin-right: 15px;
+}
+
+#logo-container {
+    margin-left: -19px;
+    margin-top: 19px;
+}
+
+#logo {
+    width: 32%;
+}
+
+#main-container {
+    margin-left: 15px;
+}
+
+#node-container {
+    margin-top: 20px;
+}
+
+#heart {
+    color:#a52626;
+}
+
+#green {
+    color: green;
+}
+
+#red {
+    color: red;
+}
+
+#footer {
+    margin: 15px;
+    text-align: center;
+    font-family:"Raleway","Helvetica Neue",Helvetica,Arial,sans-serif;
+}
