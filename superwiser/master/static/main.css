@@ -10,6 +10,37 @@ hr {
     cursor: pointer;
 }
 
+.hidden {
+    display: none;
+}
+
+.left {
+    float: left;
+}
+
+.clickable-icon {
+    color: #4582ec;
+    cursor: pointer;
+}
+
+.proc-settings-container {
+    margin-left: 10px;
+}
+
+.proc-gear {
+    margin-top: 5px;
+}
+
+.proc-num-input {
+    width: 70px;
+}
+
+.proc-settings-edit {
+    margin-top: -6px;
+    margin-bottom: -6px;
+}
+
+
 .disable {
     color: darkGray;
     pointer-events: none;

@@ -22,7 +22,22 @@
                         <a href="http://{{ node.node_ip }}:9001/" target="_blank">{{ node.name }}</a>
                     {% endfor %}
                     </td>
-                    <td>{{ proc.numprocs }}</td>
+                    <td>
+                        <span class="left">{{ proc.numprocs }}</span>
+                        {% if proc.running %}
+                        <div class="proc-settings-container left">
+                            <div class="proc-settings">
+                                <i class="fa fa-cog proc-gear clickable-icon" aria-hidden="true"></i>
+                            </div>
+                            <div class="proc-settings-edit hidden">
+                                <input type="number" class="proc-num-input" min="0" value="0"/>
+                                <i class="fa fa-arrow-up action clickable-icon" aria-hidden="true" type="incr" program="{{ proc.name }}"></i>
+                                <i class="fa fa-arrow-down action clickable-icon" aria-hidden="true" type="decr" program="{{ proc.name }}"></i>
+                                <i class="fa fa-times proc-settings-close clickable-icon" aria-hidden="true"></i>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if proc.running %}
                         <i id="green" class="fa fa-circle" aria-hidden="true"></i>
@@ -65,6 +80,7 @@ $( document ).ready(function() {
         $(this).addClass('disable');
         action = this.getAttribute('type');
         proc = this.getAttribute('program');
+        if (action == 'incr'  || action == 'decr') count = $(this).parent('div').find('input')[0].value;
         console.log("Clicked" + action + proc);
         master = window.location.host
         url = "http://" + master + "/api/"
@@ -72,6 +88,7 @@ $( document ).ready(function() {
             "action": action,
             "program": proc
         }
+        if (action == 'incr' || action == 'decr') params['count'] = count;
         $.ajax({
             'type': "POST",
             'url': url,
@@ -81,5 +98,14 @@ $( document ).ready(function() {
             },
         });                           
     });
+    $(".proc-settings").on("click", function(){
+        $(this).parent('div').find('.proc-settings-edit').removeClass("hidden");
+        $(this).addClass("hidden");
+    });
+    $(".proc-settings-close").on("click", function(){
+        $(this).parent('div').parent('div').find('.proc-settings-edit').addClass("hidden");
+        $(this).parent('div').parent('div').find('.proc-settings').removeClass("hidden");
+    });
+
 });
 </script>

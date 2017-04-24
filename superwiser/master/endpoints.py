@@ -135,7 +135,7 @@ class SuperwiserAPI(Resource):
                 pass
         elif action == 'decr':
             try:
-                if self.sauron.stop_program(
+                if self.sauron.decrease_procs(
                         post_args['program'][0], int(post_args['count'][0])):
                     out = 'OK'
             except:
