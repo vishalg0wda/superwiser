@@ -6,7 +6,8 @@ from kazoo.protocol.states import EventType
 from superwiser.common.log import logger
 from superwiser.common.path import PathMaker
 from superwiser.common.parser import manipulate_numprocs, build_conf
-from superwiser.common.parser import parse_content, unparse
+from superwiser.common.parser import parse_content, unparse, extract_section
+from superwiser.common.parser import section_from_program
 from superwiser.common.parser import extract_prog_tuples, extract_programs
 from superwiser.master.distribute import distribute_work
 
@@ -141,7 +142,20 @@ class EyeOfMordor(object):
             parse_content(self.zk.get(self.path.toolchain(orc))[0]))
 
     def list_processes(self):
-        return extract_programs(parse_content(self.get_state_conf()))
+        # Build list of processes for each orc
+        procs = []
+        for orc in self.list_orcs():
+            procs.extend(self.list_processes_for_orc(orc))
+
+        # Remap tuples with program body
+        parsed = parse_content(self.get_state_conf())
+        out = {}
+        for proc in procs:
+            out[proc[0]] = extract_section(
+                parsed,
+                section_from_program(proc[0]))
+
+        return out
 
     def get_stopped_processes(self):
         base_tups = extract_prog_tuples(
