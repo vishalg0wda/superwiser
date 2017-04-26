@@ -76,6 +76,9 @@ class SuperwiserAPI(Resource):
         self.actions = [
             'start',
             'restart',
+            'start_all',
+            'restart_all',
+            'stop_all',
             'stop',
             'incr',
             'decr'
@@ -97,50 +100,68 @@ class SuperwiserAPI(Resource):
             msg += ' '.join(self.actions)
             return msg
 
-        # All actions require a program name
-        if 'program' not in post_args:
-            request.setResponseCode(400)
-            return 'Bad Request, program parameter missing'
-
-        # Actions increment and decrement require and extra parameter count
-        if action in ['incr', 'decr'] and 'count' not in post_args:
-            request.setResponseCode(400)
-            return 'Bad Request, count parameter missing'
-
-        request.setResponseCode(200)
+        # Initializse out
         out = 'ERROR'
-        if action == 'start':
+
+        # Process actions that do not require program name
+        if action in ['restart_all', 'stop_all', 'start_all']:
             try:
-                if self.sauron.start_program(post_args['program'][0]):
+                if (action == 'restart_all' and
+                        self.sauron.restart_all_programs()):
+                    out = 'OK'
+                elif action == 'stop_all' and self.sauron.stop_all_programs():
+                    out = 'OK'
+                elif (action == 'start_all' and
+                      self.sauron.start_all_programs()):
                     out = 'OK'
             except:
                 pass
-        elif action == 'stop':
-            try:
-                if self.sauron.stop_program(post_args['program'][0]):
-                    out = 'OK'
-            except:
-                pass
-        elif action == 'restart':
-            try:
-                if self.sauron.restart_program(post_args['program'][0]):
-                    out = 'OK'
-            except:
-                pass
-        elif action == 'incr':
-            try:
-                if self.sauron.increase_procs(
-                        post_args['program'][0], int(post_args['count'][0])):
-                    out = 'OK'
-            except:
-                pass
-        elif action == 'decr':
-            try:
-                if self.sauron.decrease_procs(
-                        post_args['program'][0], int(post_args['count'][0])):
-                    out = 'OK'
-            except:
-                pass
+        else:
+            # All other actions require a program name
+            if 'program' not in post_args:
+                request.setResponseCode(400)
+                return 'Bad Request, program parameter missing'
+
+            # Actions increment and decrement require and extra parameter count
+            if action in ['incr', 'decr'] and 'count' not in post_args:
+                request.setResponseCode(400)
+                return 'Bad Request, count parameter missing'
+
+            request.setResponseCode(200)
+            if action == 'start':
+                try:
+                    if self.sauron.start_program(post_args['program'][0]):
+                        out = 'OK'
+                except:
+                    pass
+            elif action == 'stop':
+                try:
+                    if self.sauron.stop_program(post_args['program'][0]):
+                        out = 'OK'
+                except:
+                    pass
+            elif action == 'restart':
+                try:
+                    if self.sauron.restart_program(post_args['program'][0]):
+                        out = 'OK'
+                except:
+                    pass
+            elif action == 'incr':
+                try:
+                    if self.sauron.increase_procs(
+                            post_args['program'][0],
+                            int(post_args['count'][0])):
+                        out = 'OK'
+                except:
+                    pass
+            elif action == 'decr':
+                try:
+                    if self.sauron.decrease_procs(
+                            post_args['program'][0],
+                            int(post_args['count'][0])):
+                        out = 'OK'
+                except:
+                    pass
 
         return out
 
@@ -148,6 +169,7 @@ class SuperwiserAPI(Resource):
 class SuperwiserWebFactory(object):
     def make_site(self, sauron):
         static_dir = os.path.join(ROOT_DIR, 'master/static/')
+
         root = SuperwiserHome(sauron)
         root.putChild('api', SuperwiserAPI(sauron))
         root.putChild('static', File(static_dir))

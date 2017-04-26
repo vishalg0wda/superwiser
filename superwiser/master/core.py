@@ -37,6 +37,7 @@ class EyeOfMordor(object):
         self.zk.ensure_path(self.path.node())
         self.zk.ensure_path(self.path.baseconf())
         self.zk.ensure_path(self.path.stateconf())
+        self.zk.ensure_path(self.path.stateconfbkp())
 
     def register_watches(self):
         logger.info('Registering watches')
@@ -157,6 +158,17 @@ class EyeOfMordor(object):
 
         return out
 
+    def backup_state(self):
+        logger.info('Backing up state')
+        self.zk.set(
+            self.path.stateconfbkp(),
+            self.get_state_conf())
+
+    def restore_state(self):
+        logger.info('Restoring state')
+        self.set_state_conf(
+            self.zk.get(self.path.stateconfbkp())[0])
+
     def get_stopped_processes(self):
         base_tups = extract_prog_tuples(
             parse_content(self.get_base_conf()))
@@ -273,6 +285,32 @@ class Sauron(object):
     def restart_program(self, program_name):
         self.stop_program(program_name)
         return self.start_program(program_name)
+
+    def restart_all_programs(self):
+        logger.info('Restarting all programs')
+        self.stop_all_programs()
+        return self.start_all_programs()
+
+    def stop_all_programs(self):
+        """We copy state conf onto a backup path first, truncate state conf
+        and distribute.
+        """
+        logger.info('Stopping all programs')
+        self.eye.backup_state()
+        # Now truncate state conf, which triggers a distribute.
+        self.eye.set_state_conf('')
+        return True
+
+    def start_all_programs(self):
+        logger.info('Starting all programs')
+        # If state already contains conf, then do not override it
+        state_conf = self.eye.get_state_conf()
+        if state_conf != '':
+            logger.info('State conf may be overidden. Skipping')
+            return False
+        # Restore the backup state, which triggers a distribute
+        self.eye.restore_state()
+        return True
 
     def teardown(self):
         logger.info('Tearing down Sauron')
