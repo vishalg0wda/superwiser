@@ -18,6 +18,36 @@ hr {
     float: left;
 }
 
+.right {
+    float: right;
+}
+
+.heading {
+    font-size: 20px;
+    font-weight: bold;
+    float: left;
+}
+
+.head-container {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+.button {
+    color: #ffffff;
+    background-color: #2C3E48;
+    border-color: #2C3E48;
+    margin-bottom: 15px;
+    margin-right: 5px;
+    margin-left: 5px;
+}
+
+.button:hover, .button:active:focus, .button:active, .button:focus {
+    background-color: #13232B;
+    color: #ffffff;
+    border-color: #405865;
+}
+
 .clickable-icon {
     color: #4582ec;
     cursor: pointer;

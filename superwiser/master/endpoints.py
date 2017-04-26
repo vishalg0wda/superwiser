@@ -58,12 +58,17 @@ class SuperwiserHome(Resource):
         # Concatenate the two lists
         processes.extend(stopped_processes)
 
-        return processes, orcs
+        # Identify if all processes were stopped
+        was_stopped = self.sauron.was_stopped()
+
+        return processes, orcs, was_stopped
 
     def render_GET(self, request):
-        processes, orcs = self.get_process_states()
+        processes, orcs, was_stopped = self.get_process_states()
         context = {'all_procs': processes,
-                   'all_nodes': orcs}
+                   'all_nodes': orcs,
+                   'was_stopped': was_stopped,
+        }
         return self.template_manager.render_template('index.html',
                                                      context)
 

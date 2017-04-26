@@ -291,6 +291,9 @@ class Sauron(object):
         self.stop_all_programs()
         return self.start_all_programs()
 
+    def was_stopped(self):
+        return self.eye.get_state_conf() == ''
+
     def stop_all_programs(self):
         """We copy state conf onto a backup path first, truncate state conf
         and distribute.
