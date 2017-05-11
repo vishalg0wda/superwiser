@@ -1,7 +1,6 @@
 import optparse
 
-from twisted.internet import reactor, inotify
-from twisted.python import filepath
+from twisted.internet import reactor
 from yaml import load
 
 from superwiser.master.core import SauronFactory
@@ -52,35 +51,21 @@ def build_conf(options):
     return conf
 
 
-def register_listeners(**kwargs):
-    """Place all listener registrations like TCP, Web, File Watch, etc here.
-    """
-    sauron = kwargs['sauron']
+def start_server():
+    options = parse_opts()
+    conf = build_conf(options)
 
-    # Register File Watcher
-    notifier = inotify.INotify()
-    notifier.startReading()
-    notifier.watch(filepath.FilePath(
-        kwargs['supervisor_conf']), callbacks=[sauron.on_conf_change])
-
+    sauron = SauronFactory().make_sauron(**conf)
     # Register TCP listener
     reactor.listenTCP(
-        kwargs['master_tcp_port'],
+        conf['master_tcp_port'],
         SuperwiserTCPFactory(sauron))
 
     # Register Web listener
     logger.info('Adding web interface')
     reactor.listenTCP(
-        kwargs['master_web_port'],
+        conf['master_web_port'],
         SuperwiserWebFactory().make_site(sauron))
-
-
-def start_server():
-    options = parse_opts()
-    conf = build_conf(options)
-    sauron = SauronFactory().make_sauron(**conf)
-
-    register_listeners(sauron=sauron, **conf)
 
     # Register teardown function
     reactor.addSystemEventTrigger('before', 'shutdown', sauron.teardown)

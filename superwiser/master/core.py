@@ -4,6 +4,7 @@ from kazoo.client import KazooClient
 from kazoo.recipe.watchers import DataWatch, ChildrenWatch
 from kazoo.protocol.states import EventType
 from twisted.internet import inotify
+from twisted.python import filepath
 
 from superwiser.common.log import logger
 from superwiser.common.path import PathMaker
@@ -189,10 +190,12 @@ class EyeOfMordor(object):
 
 
 class Sauron(object):
-    def __init__(self, eye, conf, override_state):
+    def __init__(self, eye, conf, override_state, conf_path):
         self.eye = eye
         self.conf = conf
         self.override_state = override_state
+        self.conf_path = conf_path
+        self.notifier = None
         self.setup()
 
     def setup(self):
@@ -203,12 +206,24 @@ class Sauron(object):
         else:
             # Merge provided conf with state conf
             self.eye.set_base_conf(self.conf)
+        # Register File Watcher
+        notifier = inotify.INotify()
+        notifier.startReading()
+        notifier.watch(filepath.FilePath(
+            self.conf_path), callbacks=[self.on_conf_change])
+        self.notifer = notifier
 
-    def on_conf_change(self, ignore, filepath, mask):
-        """Calllback to be invoked when the file at config path changes."""
-        if mask == inotify.IN_MODIFY:
+    def on_conf_change(self, ignore, fp, mask):
+        """Callback to be invoked when the file at config path changes."""
+        if mask == inotify.IN_DELETE_SELF:
             logger.info('Handling conf path change')
-            with filepath.open() as conf:
+            self.notifer.stopReading()
+            notifier = inotify.INotify()
+            notifier.startReading()
+            notifier.watch(filepath.FilePath(fp.path),
+                           callbacks=[self.on_conf_change])
+            self.notifer = notifier
+            with fp.open() as conf:
                 self.eye.set_base_conf(conf.read())
 
     def increase_procs(self, program_name, factor=1):
@@ -337,13 +352,13 @@ class SauronFactory(object):
             zk_port = kwargs['zookeeper_port']
             auto_redistribute = kwargs['auto_redistribute_on_failure']
             node_drop_callbacks = kwargs['node_drop_callbacks']
-            supervisor_conf = kwargs['supervisor_conf']
+            conf_path = kwargs['supervisor_conf']
             override_state = kwargs['override_state']
 
-            if not os.path.exists(supervisor_conf):
+            if not os.path.exists(conf_path):
                 raise Exception('Supervisor conf does not exist')
 
-            supervisor_conf = self.read_conf(supervisor_conf)
+            supervisor_conf = self.read_conf(conf_path)
 
             inst = Sauron(
                 EyeOfMordor(
@@ -352,7 +367,8 @@ class SauronFactory(object):
                     auto_redistribute=auto_redistribute,
                     node_drop_callbacks=node_drop_callbacks),
                 supervisor_conf,
-                override_state)
+                override_state,
+                conf_path)
 
             SauronFactory._instance = inst
 
