@@ -33,8 +33,6 @@ def parse_opts():
                       action='store_true')
     parser.add_option('--supervisor-conf')
     (options, _) = parser.parse_args()
-    if not options.supervisor_conf:
-        parser.error('--supervisor-conf not provided')
     return options
 
 
@@ -48,6 +46,8 @@ def build_conf(options):
     # Apply specified parameters as overrides
     overrides = {k: v for k, v in options.__dict__.items() if k not in conf}
     conf.update(overrides)
+    if conf['supervisor_conf'] is None:
+        raise Exception('Supervisor conf not provided')
     return conf
 
 

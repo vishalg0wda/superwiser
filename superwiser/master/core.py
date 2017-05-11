@@ -225,6 +225,9 @@ class Sauron(object):
             self.notifer = notifier
             with fp.open() as conf:
                 self.eye.set_base_conf(conf.read())
+        elif mask == inotify.IN_MODIFY:
+            with fp.open() as conf:
+                self.eye.set_base_conf(conf.read())
 
     def increase_procs(self, program_name, factor=1):
         logger.info('Increasing procs')
