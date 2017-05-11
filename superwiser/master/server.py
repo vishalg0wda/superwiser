@@ -1,6 +1,7 @@
 import optparse
 
-from twisted.internet import reactor
+from twisted.internet import reactor, inotify
+from twisted.python import filepath
 from yaml import load
 
 from superwiser.master.core import SauronFactory
@@ -28,8 +29,14 @@ def parse_opts():
                       action='append',
                       dest='node_drop_callbacks',
                       default=[])
-    parser.add_option('--supervisor-conf', dest='supervisor_conf')
-    return parser.parse_args()[0]
+    parser.add_option('--override-state',
+                      default=False,
+                      action='store_true')
+    parser.add_option('--supervisor-conf')
+    (options, _) = parser.parse_args()
+    if not options.supervisor_conf:
+        parser.error('--supervisor-conf not provided')
+    return options
 
 
 def build_conf(options):
@@ -45,24 +52,39 @@ def build_conf(options):
     return conf
 
 
+def register_listeners(**kwargs):
+    """Place all listener registrations like TCP, Web, File Watch, etc here.
+    """
+    sauron = kwargs['sauron']
+
+    # Register File Watcher
+    notifier = inotify.INotify()
+    notifier.startReading()
+    notifier.watch(filepath.FilePath(
+        kwargs['supervisor_conf']), callbacks=[sauron.on_conf_change])
+
+    # Register TCP listener
+    reactor.listenTCP(
+        kwargs['master_tcp_port'],
+        SuperwiserTCPFactory(sauron))
+
+    # Register Web listener
+    logger.info('Adding web interface')
+    reactor.listenTCP(
+        kwargs['master_web_port'],
+        SuperwiserWebFactory().make_site(sauron))
+
+
 def start_server():
     options = parse_opts()
     conf = build_conf(options)
     sauron = SauronFactory().make_sauron(**conf)
 
+    register_listeners(sauron=sauron, **conf)
+
     # Register teardown function
     reactor.addSystemEventTrigger('before', 'shutdown', sauron.teardown)
 
     logger.info('Starting server now')
-    # Add tcp listener
-    reactor.listenTCP(
-        conf['master_tcp_port'],
-        SuperwiserTCPFactory(sauron))
-
-    logger.info('Adding web interface')
-    # Add web listener
-    reactor.listenTCP(
-        conf['master_web_port'],
-        SuperwiserWebFactory().make_site(sauron))
 
     reactor.run()

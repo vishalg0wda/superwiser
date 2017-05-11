@@ -1,7 +1,9 @@
+import os
 import requests
 from kazoo.client import KazooClient
 from kazoo.recipe.watchers import DataWatch, ChildrenWatch
 from kazoo.protocol.states import EventType
+from twisted.internet import inotify
 
 from superwiser.common.log import logger
 from superwiser.common.path import PathMaker
@@ -187,24 +189,27 @@ class EyeOfMordor(object):
 
 
 class Sauron(object):
-    def __init__(self, eye, conf=None):
+    def __init__(self, eye, conf, override_state):
         self.eye = eye
         self.conf = conf
+        self.override_state = override_state
         self.setup()
 
     def setup(self):
         logger.info('Setting up Sauron')
-        # Override previous state of conf
-        if self.conf is not None:
-            # Note: this will trigger a distribute
-            self.eye.set_base_conf(self.conf)
+        if self.override_state:
+            # Override previous state of conf
+            self.eye.set_state_conf(self.conf)
         else:
-            # Trigger a distribute anyway
-            self.eye.distribute()
+            # Merge provided conf with state conf
+            self.eye.set_base_conf(self.conf)
 
-    def update_conf(self, conf):
-        logger.info('Updating conf')
-        self.eye.set_base_conf(conf)
+    def on_conf_change(self, ignore, filepath, mask):
+        """Calllback to be invoked when the file at config path changes."""
+        if mask == inotify.IN_MODIFY:
+            logger.info('Handling conf path change')
+            with filepath.open() as conf:
+                self.eye.set_base_conf(conf.read())
 
     def increase_procs(self, program_name, factor=1):
         logger.info('Increasing procs')
@@ -333,9 +338,12 @@ class SauronFactory(object):
             auto_redistribute = kwargs['auto_redistribute_on_failure']
             node_drop_callbacks = kwargs['node_drop_callbacks']
             supervisor_conf = kwargs['supervisor_conf']
+            override_state = kwargs['override_state']
 
-            if supervisor_conf is not None:
-                supervisor_conf = self.read_conf(supervisor_conf)
+            if not os.path.exists(supervisor_conf):
+                raise Exception('Supervisor conf does not exist')
+
+            supervisor_conf = self.read_conf(supervisor_conf)
 
             inst = Sauron(
                 EyeOfMordor(
@@ -343,7 +351,8 @@ class SauronFactory(object):
                     port=zk_port,
                     auto_redistribute=auto_redistribute,
                     node_drop_callbacks=node_drop_callbacks),
-                supervisor_conf)
+                supervisor_conf,
+                override_state)
 
             SauronFactory._instance = inst
 
