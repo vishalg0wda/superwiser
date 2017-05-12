@@ -28,10 +28,16 @@ def parse_opts():
                       action='append',
                       dest='node_drop_callbacks',
                       default=[])
+    parser.add_option('--supervisor-down-callback',
+                      action='append',
+                      dest='supervisor_down_callbacks',
+                      default=[])
     parser.add_option('--override-state',
                       default=False,
                       action='store_true')
     parser.add_option('--supervisor-conf')
+    parser.add_option('--supervisor-poll-interval',
+                      type='int', default=15)
     (options, _) = parser.parse_args()
     return options
 

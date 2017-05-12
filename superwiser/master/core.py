@@ -1,9 +1,10 @@
 import os
 import requests
+import xmlrpclib
 from kazoo.client import KazooClient
 from kazoo.recipe.watchers import DataWatch, ChildrenWatch
 from kazoo.protocol.states import EventType
-from twisted.internet import inotify
+from twisted.internet import inotify, task
 from twisted.python import filepath
 
 from superwiser.common.log import logger
@@ -16,11 +17,15 @@ from superwiser.master.distribute import distribute_work
 
 
 class EyeOfMordor(object):
-    def __init__(self, host, port, auto_redistribute, node_drop_callbacks):
+    def __init__(self, host, port, auto_redistribute, **kwargs):
         self.zk = KazooClient('{}:{}'.format(host, port))
         self.path = PathMaker()
         self.auto_redistribute = auto_redistribute
-        self.node_drop_callbacks = node_drop_callbacks
+        self.node_drop_callbacks = kwargs.get('node_drop_callbacks', [])
+        self.supervisor_down_callbacks = kwargs.get(
+            'supervisor_down_callbacks', [])
+        self.supervisor_poll_interval = kwargs.get(
+            'supervisor_poll_interval', 15)
         self.toolchains = []
         self.setup()
 
@@ -33,6 +38,35 @@ class EyeOfMordor(object):
         self.toolchains = self.zk.get_children(self.path.toolchain())
         # Register watches
         self.register_watches()
+        # Setup looping call to poll for supervisor states
+        self.setup_poller()
+
+    def is_supervisor_running(self, host):
+        logger.info('Polling supervisor')
+        server = xmlrpclib.Server(
+            'http://sauron:lotr@{}:9001/RPC2'.format(host))
+        try:
+            state = server.supervisor.getState()
+            return state['statecode'] == 1
+        except:
+            return False
+
+    def setup_poller(self):
+        logger.info('Setting up poller')
+
+        def poller():
+            hosts = [self.get_orc_ip(orc) for orc in self.list_orcs()]
+            # Iterate over every orc and poll for supervisor state
+            for host in hosts:
+                if not self.is_supervisor_running(host):
+                    logger.warn('Supervisor on {} is not running'.format(host))
+                    # Hit the registered callback to indicate that
+                    # supervisor is not running
+                    for cb in self.supervisor_down_callbacks:
+                        requests.post(cb, json={'host': host})
+
+        loop = task.LoopingCall(poller)
+        loop.start(self.supervisor_poll_interval)
 
     def setup_paths(self):
         logger.info('Setting up paths')
@@ -107,7 +141,7 @@ class EyeOfMordor(object):
             # Hit callbacks
             for url in self.node_drop_callbacks:
                 requests.post(url,
-                              data={'node_count': len(children)})
+                              json={'node_count': len(children)})
             if self.auto_redistribute:
                 self.distribute()
         self.toolchains = children
@@ -355,8 +389,10 @@ class SauronFactory(object):
             zk_port = kwargs['zookeeper_port']
             auto_redistribute = kwargs['auto_redistribute_on_failure']
             node_drop_callbacks = kwargs['node_drop_callbacks']
+            supervisor_down_callbacks = kwargs['supervisor_down_callbacks']
             conf_path = kwargs['supervisor_conf']
             override_state = kwargs['override_state']
+            supervisor_poll_interval = kwargs['supervisor_poll_interval']
 
             if not os.path.exists(conf_path):
                 raise Exception('Supervisor conf does not exist')
@@ -368,7 +404,9 @@ class SauronFactory(object):
                     host=zk_host,
                     port=zk_port,
                     auto_redistribute=auto_redistribute,
-                    node_drop_callbacks=node_drop_callbacks),
+                    node_drop_callbacks=node_drop_callbacks,
+                    supervisor_down_callbacks=supervisor_down_callbacks,
+                    supervisor_poll_interval=supervisor_poll_interval),
                 supervisor_conf,
                 override_state,
                 conf_path)
