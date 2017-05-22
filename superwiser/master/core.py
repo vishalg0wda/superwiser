@@ -63,7 +63,15 @@ class EyeOfMordor(object):
                     # Hit the registered callback to indicate that
                     # supervisor is not running
                     for cb in self.supervisor_down_callbacks:
-                        requests.post(cb, json={'host': host})
+                        requests.post(
+                            cb['url'],
+                            json={
+                                'host': host,
+                                'event': 'supervisor_down',
+                            },
+                            headers={
+                                'Authorization': cb.get('auth_token', '')
+                            })
 
         loop = task.LoopingCall(poller)
         loop.start(self.supervisor_poll_interval)
@@ -139,9 +147,15 @@ class EyeOfMordor(object):
         elif removed:
             logger.info('Toolchain left')
             # Hit callbacks
-            for url in self.node_drop_callbacks:
-                requests.post(url,
-                              json={'node_count': len(children)})
+            for cb in self.node_drop_callbacks:
+                requests.post(cb['url'],
+                              json={
+                                  'node_count': len(children),
+                                  'event': 'toolchain_dropped',
+                              },
+                              headers={
+                                  'Authorization': cb.get('auth_token', ''),
+                              })
             if self.auto_redistribute:
                 self.distribute()
         self.toolchains = children
@@ -388,8 +402,9 @@ class SauronFactory(object):
             zk_host = kwargs['zookeeper_host']
             zk_port = kwargs['zookeeper_port']
             auto_redistribute = kwargs['auto_redistribute_on_failure']
-            node_drop_callbacks = kwargs['node_drop_callbacks']
-            supervisor_down_callbacks = kwargs['supervisor_down_callbacks']
+            node_drop_callbacks = kwargs.get('node_drop_callbacks', [])
+            supervisor_down_callbacks = kwargs.get(
+                'supervisor_down_callbacks', [])
             conf_path = kwargs['supervisor_conf']
             override_state = kwargs['override_state']
             supervisor_poll_interval = kwargs['supervisor_poll_interval']

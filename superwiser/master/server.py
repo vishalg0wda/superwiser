@@ -24,14 +24,6 @@ def parse_opts():
                       action='store_true',
                       default=False,
                       dest='auto_redistribute_on_failure')
-    parser.add_option('--node-drop-callback',
-                      action='append',
-                      dest='node_drop_callbacks',
-                      default=[])
-    parser.add_option('--supervisor-down-callback',
-                      action='append',
-                      dest='supervisor_down_callbacks',
-                      default=[])
     parser.add_option('--override-state',
                       default=False,
                       action='store_true')
