@@ -68,9 +68,7 @@ class EyeOfMordor(object):
                             json={
                                 'host': host,
                                 'event': 'supervisor_down',
-                            },
-                            headers={
-                                'Authorization': cb.get('auth_token', '')
+                                'token': cb.get('auth_token', '')
                             })
 
         loop = task.LoopingCall(poller)
@@ -152,9 +150,7 @@ class EyeOfMordor(object):
                               json={
                                   'node_count': len(children),
                                   'event': 'toolchain_dropped',
-                              },
-                              headers={
-                                  'Authorization': cb.get('auth_token', ''),
+                                  'token': cb.get('auth_token', ''),
                               })
             if self.auto_redistribute:
                 self.distribute()
