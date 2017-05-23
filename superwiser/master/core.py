@@ -1,5 +1,6 @@
 import os
 import requests
+import jinja2
 import xmlrpclib
 from kazoo.client import KazooClient
 from kazoo.recipe.watchers import DataWatch, ChildrenWatch
@@ -26,6 +27,7 @@ class EyeOfMordor(object):
             'supervisor_down_callbacks', [])
         self.supervisor_poll_interval = kwargs.get(
             'supervisor_poll_interval', 15)
+        self.project_dir = kwargs['project_dir']
         self.toolchains = []
         self.setup()
 
@@ -90,13 +92,20 @@ class EyeOfMordor(object):
             self.zk, self.path.toolchain(),
             self.on_toolchains, send_event=True)
 
+    def interpolate_vars_in_conf(self, conf):
+        t = jinja2.Template(conf)
+        return t.render(
+            PYTHON='python',
+            PROJECT_DIR=self.project_dir)
+
     def _distribute(self, work, toolchains):
         # Distribute conf across toolchains
         assigned_work = distribute_work(work, toolchains)
         for (toolchain, awork) in assigned_work.items():
             self.zk.set(
                 self.path.toolchain(toolchain),
-                unparse(build_conf(awork, parse_content(work))))
+                self.interpolate_vars_in_conf(
+                    unparse(build_conf(awork, parse_content(work)))))
 
     def distribute(self):
         self._distribute(
@@ -417,7 +426,8 @@ class SauronFactory(object):
                     auto_redistribute=auto_redistribute,
                     node_drop_callbacks=node_drop_callbacks,
                     supervisor_down_callbacks=supervisor_down_callbacks,
-                    supervisor_poll_interval=supervisor_poll_interval),
+                    supervisor_poll_interval=supervisor_poll_interval,
+                    project_dir=kwargs.get('project_dir', '')),
                 supervisor_conf,
                 override_state,
                 conf_path)

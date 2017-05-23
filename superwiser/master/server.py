@@ -30,6 +30,8 @@ def parse_opts():
     parser.add_option('--supervisor-conf')
     parser.add_option('--supervisor-poll-interval',
                       type='int', default=15)
+    parser.add_option('--django-project-dir', default='',
+                      dest='project_dir', type='str')
     (options, _) = parser.parse_args()
     return options
 
