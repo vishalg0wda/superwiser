@@ -96,16 +96,17 @@ class EyeOfMordor(object):
         t = jinja2.Template(conf)
         return t.render(
             PYTHON='python',
-            PROJECT_DIR=self.project_dir)
+            PROJECT_DIR=self.project_dir).encode('utf8')
 
     def _distribute(self, work, toolchains):
         # Distribute conf across toolchains
         assigned_work = distribute_work(work, toolchains)
         for (toolchain, awork) in assigned_work.items():
+            conf = self.interpolate_vars_in_conf(
+                unparse(build_conf(awork, parse_content(work))))
             self.zk.set(
                 self.path.toolchain(toolchain),
-                self.interpolate_vars_in_conf(
-                    unparse(build_conf(awork, parse_content(work)))))
+                conf)
 
     def distribute(self):
         self._distribute(
@@ -132,7 +133,8 @@ class EyeOfMordor(object):
 
                 prog_tuples.append(tup)
             # Trigger distribute
-            self.set_state_conf(unparse(build_conf(prog_tuples, base_conf)))
+            state_conf = unparse(build_conf(prog_tuples, base_conf))
+            self.set_state_conf(state_conf)
 
     def on_state_conf_change(self, data, stat, event):
         if event and event.type == EventType.CHANGED:
