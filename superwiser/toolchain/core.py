@@ -26,6 +26,11 @@ class Orc(object):
             while new_name in used_names:
                 new_name = self.name_gen.generate()
             self.name = new_name
+            # Register watch
+            DataWatch(
+                self.zk,
+                self.path.toolchain(self.name),
+                self.on_sync)
             # Setup path for conf synchronization
             self.zk.create(
                 self.path.toolchain(new_name),
@@ -41,11 +46,6 @@ class Orc(object):
         self.zk.start()
         # Setup nodes
         self.setup_nodes()
-        # Register watch
-        DataWatch(
-            self.zk,
-            self.path.toolchain(self.name),
-            self.on_sync)
 
     def on_sync(self, data, stat, event):
         if event and event.type == EventType.CHANGED:
