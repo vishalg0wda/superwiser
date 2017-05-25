@@ -185,6 +185,11 @@ class EyeOfMordor(object):
         logger.info('Updating state conf')
         self.zk.set(self.path.stateconf(), conf)
 
+    def get_bkp_conf(self):
+        logger.info('Getting backed up conf')
+        data, _ = self.zk.get(self.path.stateconfbkp())
+        return data
+
     def teardown(self):
         logger.info('Tearing down the eye of Mordor!')
         self.zk.stop()
@@ -224,8 +229,7 @@ class EyeOfMordor(object):
 
     def restore_state(self):
         logger.info('Restoring state')
-        self.set_state_conf(
-            self.zk.get(self.path.stateconfbkp())[0])
+        self.set_state_conf(self.get_bkp_conf())
 
     def get_stopped_processes(self):
         base_tups = extract_prog_tuples(
@@ -314,6 +318,25 @@ class Sauron(object):
 
         return True
 
+    def get_previous_program_state(self, program_name):
+        # Try getting program from backup state
+        bkp_conf_tuples = extract_prog_tuples(
+            parse_content(self.eye.get_bkp_conf()))
+        try:
+            program_tuple = next(ele for ele in bkp_conf_tuples
+                                 if ele[0] == program_name)
+        except StopIteration:
+            # Try getting program from base conf
+            base_conf_tuples = extract_prog_tuples(
+                parse_content(self.eye.get_base_conf()))
+            try:
+                program_tuple = next(ele for ele in base_conf_tuples
+                                     if ele[0] == program_name)
+            except StopIteration:
+                return None
+
+        return program_tuple
+
     def start_program(self, program_name):
         prog_tuples = extract_prog_tuples(
             parse_content(self.eye.get_state_conf()))
@@ -322,12 +345,9 @@ class Sauron(object):
         if has_program:
             logger.info('Already contains program')
             return False
-        base_conf_tuples = extract_prog_tuples(
-            parse_content(self.eye.get_base_conf()))
-        try:
-            program_tuple = next(ele for ele in base_conf_tuples
-                                 if ele[0] == program_name)
-        except StopIteration:
+
+        program_tuple = self.get_previous_program_state(program_name)
+        if program_tuple is None:
             logger.info('Program does not exist')
             return False
         # Program did not exist, let's add it now
@@ -353,6 +373,8 @@ class Sauron(object):
         else:
             logger.info('Program is either already stopped/not defined')
             return False
+        # Backup state first to hold nummprocs of program
+        self.eye.backup_state()
         self.eye.set_state_conf(
             unparse(
                 build_conf(
