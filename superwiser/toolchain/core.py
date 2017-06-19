@@ -39,7 +39,7 @@ class Orc(object):
         self.zk.create(
             self.path.node(self.name),
             value=self.orc_host,
-            ephemeral=True)
+            ephemeral=False)
 
     def setup(self):
         logger.info('Setting up Orc')

@@ -38,10 +38,25 @@ class EyeOfMordor(object):
         self.setup_paths()
         # Initializse children
         self.toolchains = self.zk.get_children(self.path.toolchain())
+        # Remove dangling nodes if any
+        self.remove_dangling_nodes()
         # Register watches
         self.register_watches()
         # Setup looping call to poll for supervisor states
         self.setup_poller()
+
+    def remove_dangling_nodes(self):
+        """ Remove nodes to sync the children in the toolchains and the nodes
+        on zookeeper in case there have been some node drops while master was
+        away.
+        """
+        all_nodes = self.zk.get_children(self.path.node())
+        dangling_nodes = set(all_nodes) - set(self.toolchains)
+        if dangling_nodes:
+            logger.info("Found some dangling nodes. Will remove them from the cluster")
+            for node in dangling_nodes:
+                logger.info("Removing dangling node : " + self.get_orc_ip(node))
+                self.zk.delete(self.path.node(node))
 
     def is_supervisor_running(self, host):
         logger.info('Polling supervisor')
@@ -148,21 +163,25 @@ class EyeOfMordor(object):
     def on_toolchains(self, children, event):
         if not event:
             return
-        added = set(children) - set(self.toolchains)
-        removed = set(self.toolchains) - set(children)
+        added = list(set(children) - set(self.toolchains))
+        removed = list(set(self.toolchains) - set(children))
         if added:
             logger.info('Toolchain joined')
             self.distribute()
         elif removed:
             logger.info('Toolchain left')
+            host_ip = self.get_orc_ip(removed[0])
+            logger.info('IP : ' + host_ip)
             # Hit callbacks
             for cb in self.node_drop_callbacks:
                 requests.post(cb['url'],
                               json={
                                   'node_count': len(children),
+                                  'node': host_ip,
                                   'event': 'toolchain_dropped',
                                   'token': cb.get('auth_token', ''),
                               })
+            self.zk.delete(self.path.node(removed[0]))
             if self.auto_redistribute:
                 self.distribute()
         self.toolchains = children
