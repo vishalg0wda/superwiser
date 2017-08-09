@@ -1,7 +1,6 @@
 import os
 import requests
 import jinja2
-import xmlrpclib
 from kazoo.client import KazooClient
 from kazoo.recipe.watchers import DataWatch, ChildrenWatch
 from kazoo.protocol.states import EventType
@@ -15,6 +14,7 @@ from superwiser.common.parser import parse_content, unparse, extract_section
 from superwiser.common.parser import section_from_program
 from superwiser.common.parser import extract_prog_tuples, extract_programs
 from superwiser.master.distribute import distribute_work
+from superwiser.master.rpcutils import TimeoutServerProxy
 
 
 class EyeOfMordor(object):
@@ -59,19 +59,22 @@ class EyeOfMordor(object):
                 self.zk.delete(self.path.node(node))
 
     def is_supervisor_running(self, host):
-        logger.info('Polling supervisor')
-        server = xmlrpclib.Server(
-            'http://sauron:lotr@{}:9001/RPC2'.format(host))
+        server = TimeoutServerProxy(
+            'http://sauron:lotr@{}:9001/RPC2'.format(host),
+            timeout=3)
         try:
             state = server.supervisor.getState()
             return state['statecode'] == 1
-        except:
+        except Exception as e:
+            err_msg = 'Supervisor state check failed. host: {host} msg: {msg}'
+            logger.warn(err_msg.format(host=host, msg=e.message))
             return False
 
     def setup_poller(self):
         logger.info('Setting up poller')
 
         def poller():
+            logger.info('Polling nodes for supervisor state check')
             hosts = [self.get_orc_ip(orc) for orc in self.list_orcs()]
             # Iterate over every orc and poll for supervisor state
             for host in hosts:
@@ -80,13 +83,23 @@ class EyeOfMordor(object):
                     # Hit the registered callback to indicate that
                     # supervisor is not running
                     for cb in self.supervisor_down_callbacks:
-                        requests.post(
-                            cb['url'],
-                            json={
-                                'host': host,
-                                'event': 'supervisor_down',
-                                'token': cb.get('auth_token', '')
-                            })
+                        logger.info('Hitting callback. Host: ' + cb['url'])
+                        try:
+                            requests.post(
+                                cb['url'],
+                                json={
+                                    'host': host,
+                                    'event': 'supervisor_down',
+                                    'token': cb.get('auth_token', '')
+                                },
+                                timeout=3)
+                        except Exception as e:
+                            err_msg = 'Callback failed. host: {host}, ' \
+                                      'msg: {msg}'
+                            logger.warn(err_msg.format(host=cb['url'],
+                                                       msg=e.message))
+
+            logger.info('Supervisor state check poll complete')
 
         loop = task.LoopingCall(poller)
         loop.start(self.supervisor_poll_interval)
@@ -174,13 +187,20 @@ class EyeOfMordor(object):
             logger.info('IP : ' + host_ip)
             # Hit callbacks
             for cb in self.node_drop_callbacks:
-                requests.post(cb['url'],
-                              json={
-                                  'node_count': len(children),
-                                  'node': host_ip,
-                                  'event': 'toolchain_dropped',
-                                  'token': cb.get('auth_token', ''),
-                              })
+                logger.info('Hitting callback. Host: ' + cb['url'])
+
+                try:
+                    requests.post(cb['url'],
+                                  json={
+                                      'node_count': len(children),
+                                      'node': host_ip,
+                                      'event': 'toolchain_dropped',
+                                      'token': cb.get('auth_token', ''),
+                                  },
+                                  timeout=3)
+                except Exception as e:
+                    err_msg = 'Callback failed. host: {host}, msg: {msg}'
+                    logger.warn(err_msg.format(host=cb['url'], msg=e.message))
             self.zk.delete(self.path.node(removed[0]))
             if self.auto_redistribute:
                 self.distribute()
